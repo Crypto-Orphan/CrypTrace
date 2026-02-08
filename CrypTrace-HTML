@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrypTrace</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Yu Gothic', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(15, 15, 25, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-bottom: 2px solid rgba(0, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: clamp(20px, 4vw, 28px);
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .input-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input, select {
+            padding: 12px 15px;
+            background: rgba(30, 30, 45, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+            transition: all 0.3s;
+            min-width: 200px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+
+        button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #00ffff, #0088ff);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 255, 255, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .api-config-btn {
+            background: linear-gradient(135deg, #ff00ff, #ff0088);
+            padding: 10px 20px;
+            font-size: 12px;
+        }
+
+        .export-pdf-btn {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+            padding: 10px 20px;
+            font-size: 12px;
+        }
+
+        .add-chain-btn {
+            background: linear-gradient(135deg, #ffaa00, #ff6600);
+            padding: 10px 20px;
+            font-size: 12px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #mindmapCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        #mindmapCanvas:active {
+            cursor: grabbing;
+        }
+
+        /* モーダル共通スタイル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: rgba(15, 15, 25, 0.98);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 50px rgba(0, 255, 255, 0.3);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .modal-title {
+            font-size: 24px;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-close {
+            background: rgba(255, 0, 100, 0.8);
+            border: none;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            padding: 0;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 0, 100, 1);
+            transform: rotate(90deg);
+        }
+
+        /* API選択モーダル */
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .api-card {
+            background: rgba(30, 30, 45, 0.8);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .api-card:hover {
+            border-color: #00ffff;
+            box-shadow: 0 5px 20px rgba(0, 255, 255, 0.3);
+            transform: translateY(-3px);
+        }
+
+        .api-card.selected {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .api-card-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+
+        .api-card-chains {
+            font-size: 12px;
+            color: #ff00ff;
+            margin-bottom: 10px;
+        }
+
+        .api-card-desc {
+            font-size: 13px;
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+
+        .api-card-status {
+            margin-top: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            display: inline-block;
+        }
+
+        .status-free {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .status-paid {
+            background: rgba(255, 136, 0, 0.2);
+            color: #ff8800;
+        }
+
+        .api-key-section {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(30, 30, 45, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .api-key-section h3 {
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .api-key-input {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 25px;
+        }
+
+        .btn-cancel {
+            background: rgba(100, 100, 120, 0.8);
+            color: #e0e0e0;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #00ff88, #00cc66);
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 15, 25, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 350px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 10;
+        }
+
+        .info-panel.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .info-panel h3 {
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .info-item {
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: #ff00ff;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            color: #e0e0e0;
+            word-break: break-all;
+            background: rgba(30, 30, 45, 0.6);
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #00ffff;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 0, 100, 0.8);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 0, 100, 1);
+            transform: rotate(90deg);
+        }
+
+        .explore-btn {
+            margin-top: 15px;
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #ff00ff, #ff0088);
+            font-size: 12px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(15, 15, 25, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 10;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .legend-title {
+            color: #00ffff;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            background: rgba(15, 15, 25, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(0, 255, 255, 0.3);
+            border-top-color: #00ffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 15px;
+            color: #00ffff;
+            font-size: 14px;
+        }
+
+        .api-status-badge {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: rgba(15, 15, 25, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        .api-status-badge .status-label {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .api-status-badge .status-value {
+            color: #00ff88;
+        }
+
+        .tutorial-box {
+            background: rgba(255, 136, 0, 0.1);
+            border: 1px solid rgba(255, 136, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .tutorial-box h4 {
+            color: #ffaa00;
+            margin-bottom: 10px;
+        }
+
+        .tutorial-box p {
+            color: #e0e0e0;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .tutorial-box ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .tutorial-box li {
+            color: #e0e0e0;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 15px;
+            }
+
+            .input-section {
+                flex-direction: column;
+            }
+
+            input, select {
+                min-width: 100%;
+            }
+
+            .info-panel {
+                max-width: calc(100% - 40px);
+                right: 20px;
+                left: 20px;
+            }
+
+            .legend {
+                bottom: 10px;
+                left: 10px;
+                font-size: 11px;
+            }
+
+            .api-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                margin: 20px;
+                max-width: calc(100% - 40px);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 30, 45, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 255, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particles"></canvas>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🔗 ブロックチェーンエクスプローラー Pro</h1>
+            <div class="input-section">
+                <div class="input-group">
+                    <label>通貨種別</label>
+                    <select id="chainSelect">
+                        <option value="ethereum">Ethereum (ETH)</option>
+                        <option value="bitcoin">Bitcoin (BTC)</option>
+                        <option value="polygon">Polygon (MATIC)</option>
+                        <option value="bsc">Binance Smart Chain (BSC)</option>
+                        <option value="arbitrum">Arbitrum</option>
+                        <option value="optimism">Optimism</option>
+                        <option value="base">Base</option>
+                        <option value="solana">Solana (SOL)</option>
+                        <option value="tron">Tron (TRX)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>アドレス / トランザクションハッシュ</label>
+                    <input type="text" id="addressInput" placeholder="0x... or bc1...">
+                </div>
+                <div class="input-group" id="tokenSelectGroup">
+                    <label>トークン種別</label>
+                    <select id="tokenSelect">
+                        <option value="native">ネイティブ通貨</option>
+                        <option value="usdt">USDT</option>
+                        <option value="usdc">USDC</option>
+                        <option value="all">全てのトークン</option>
+                    </select>
+                </div>
+                <button id="exploreBtn">🔍 探索開始</button>
+                <button class="api-config-btn" id="apiConfigBtn">⚙️ API設定</button>
+                <button class="add-chain-btn" id="addChainBtn">➕ チェーン追加</button>
+                <button class="export-pdf-btn" id="exportPdfBtn">📄 PDF出力</button>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="mindmapCanvas"></canvas>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">トランザクションを読み込み中...</div>
+            </div>
+
+            <div class="api-status-badge">
+                <span class="status-label">API: </span>
+                <span class="status-value" id="currentApi">未設定</span>
+            </div>
+
+            <div class="info-panel" id="infoPanel">
+                <button class="close-btn" id="closeBtn">×</button>
+                <h3>📊 アドレス情報</h3>
+                <div id="infoPanelContent"></div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-title">🎨 凡例</div>
+                <div id="legendContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API設定モーダル -->
+    <div class="modal" id="apiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">⚙️ API設定</h2>
+                <button class="modal-close" id="apiModalClose">×</button>
+            </div>
+
+            <div class="tutorial-box">
+                <h4>📖 初めての方へ - APIキーの取得方法</h4>
+                <p><strong>Etherscan (Ethereum用):</strong></p>
+                <ol>
+                    <li>https://etherscan.io/ にアクセス</li>
+                    <li>「Sign In」→「Sign Up」でアカウント作成（無料）</li>
+                    <li>メール認証後、ログイン</li>
+                    <li>「API Keys」タブ → 「Add」ボタンでキー作成</li>
+                    <li>表示されたキーをコピーして下の入力欄に貼り付け</li>
+                </ol>
+                <p style="margin-top: 10px;"><strong>💡 ヒント:</strong> まずはEtherscanから始めるのがおすすめです！</p>
+            </div>
+            
+            <div class="api-grid" id="apiGrid"></div>
+
+            <div class="api-key-section">
+                <h3>🔑 APIキー設定</h3>
+                <p style="color: #aaa; font-size: 12px; margin-bottom: 15px;">
+                    選択したAPIサービスのAPIキーを入力してください。<br>
+                    各サービスの公式サイトで無料アカウントを作成することで取得できます。
+                </p>
+                <input type="text" class="api-key-input" id="apiKeyInput" placeholder="APIキーを入力 (例: YOUR_API_KEY_HERE)">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" id="apiCancelBtn">キャンセル</button>
+                <button class="btn-save" id="apiSaveBtn">保存して適用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- チェーン追加モーダル -->
+    <div class="modal" id="addChainModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">➕ カスタムチェーン追加</h2>
+                <button class="modal-close" id="addChainModalClose">×</button>
+            </div>
+
+            <div class="tutorial-box">
+                <h4>📖 カスタムチェーンの追加方法</h4>
+                <p>独自のブロックチェーンやテストネットを追加できます。</p>
+                <p style="margin-top: 10px;"><strong>必要な情報:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 5px;">
+                    <li>チェーン名（例: Avalanche, Fantom）</li>
+                    <li>チェーンID（任意の識別子）</li>
+                    <li>APIエンドポイントURL</li>
+                    <li>表示カラー（16進数）</li>
+                </ul>
+            </div>
+
+            <div style="display: grid; gap: 15px; margin: 20px 0;">
+                <div class="input-group">
+                    <label>チェーン名</label>
+                    <input type="text" id="customChainName" placeholder="例: Avalanche">
+                </div>
+                <div class="input-group">
+                    <label>チェーンID（英数字のみ）</label>
+                    <input type="text" id="customChainId" placeholder="例: avalanche">
+                </div>
+                <div class="input-group">
+                    <label>APIエンドポイント</label>
+                    <input type="text" id="customChainApi" placeholder="例: https://api.snowtrace.io/api">
+                </div>
+                <div class="input-group">
+                    <label>表示カラー</label>
+                    <input type="color" id="customChainColor" value="#e84142">
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" id="addChainCancelBtn">キャンセル</button>
+                <button class="btn-save" id="addChainSaveBtn">追加</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // グローバル変数
+        // ========================================
+        let selectedApi = null;
+        let apiKey = null;
+        let currentApiConfig = {
+            name: '未設定',
+            provider: null,
+            key: null
+        };
+
+        // カスタムチェーンを保存
+        let customChains = JSON.parse(localStorage.getItem('customChains') || '{}');
+
+        // ========================================
+        // チェーンとAPIの設定
+        // ========================================
+        const chainColors = {
+            ethereum: '#00ffff',
+            bitcoin: '#ff9500',
+            polygon: '#8247e5',
+            bsc: '#f0b90b',
+            arbitrum: '#28a0f0',
+            optimism: '#ff0420',
+            base: '#0052ff',
+            solana: '#14f195',
+            tron: '#ff0013',
+            usdt: '#26a17b',
+            usdc: '#2775ca',
+            other: '#ff00ff'
+        };
+
+        // Bitcoin系チェーン（トークン選択不可）
+        const utxoChains = ['bitcoin'];
+
+        const apiConfigs = {
+            etherscan: {
+                name: 'Etherscan',
+                chains: ['ethereum'],
+                baseUrl: 'https://api.etherscan.io/api',
+                docs: 'https://docs.etherscan.io/',
+                needsKey: true
+            },
+            polygonscan: {
+                name: 'PolygonScan',
+                chains: ['polygon'],
+                baseUrl: 'https://api.polygonscan.com/api',
+                docs: 'https://docs.polygonscan.com/',
+                needsKey: true
+            },
+            bscscan: {
+                name: 'BscScan',
+                chains: ['bsc'],
+                baseUrl: 'https://api.bscscan.com/api',
+                docs: 'https://docs.bscscan.com/',
+                needsKey: true
+            },
+            basescan: {
+                name: 'BaseScan',
+                chains: ['base'],
+                baseUrl: 'https://api.basescan.org/api',
+                docs: 'https://docs.basescan.org/',
+                needsKey: true
+            },
+            arbiscan: {
+                name: 'Arbiscan',
+                chains: ['arbitrum'],
+                baseUrl: 'https://api.arbiscan.io/api',
+                docs: 'https://docs.arbiscan.io/',
+                needsKey: true
+            },
+            optimistic: {
+                name: 'Optimistic Etherscan',
+                chains: ['optimism'],
+                baseUrl: 'https://api-optimistic.etherscan.io/api',
+                docs: 'https://docs.optimism.etherscan.io/',
+                needsKey: true
+            },
+            blockchain: {
+                name: 'Blockchain.com',
+                chains: ['bitcoin'],
+                baseUrl: 'https://blockchain.info',
+                docs: 'https://www.blockchain.com/api',
+                needsKey: false
+            },
+            solscan: {
+                name: 'Solscan',
+                chains: ['solana'],
+                baseUrl: 'https://public-api.solscan.io',
+                docs: 'https://docs.solscan.io/',
+                needsKey: false
+            },
+            tronscan: {
+                name: 'TronScan',
+                chains: ['tron'],
+                baseUrl: 'https://apilist.tronscan.org/api',
+                docs: 'https://tronscan.org/',
+                needsKey: false
+            },
+            blockchair: {
+                name: 'Blockchair',
+                chains: ['bitcoin', 'ethereum', 'polygon'],
+                baseUrl: 'https://api.blockchair.com',
+                docs: 'https://blockchair.com/api/docs',
+                needsKey: false
+            },
+            moralis: {
+                name: 'Moralis',
+                chains: ['ethereum', 'polygon', 'bsc', 'arbitrum', 'optimism', 'base'],
+                baseUrl: 'https://deep-index.moralis.io/api/v2',
+                docs: 'https://docs.moralis.io/',
+                needsKey: true
+            },
+            alchemy: {
+                name: 'Alchemy',
+                chains: ['ethereum', 'polygon', 'arbitrum', 'optimism', 'base'],
+                baseUrl: 'https://eth-mainnet.g.alchemy.com/v2',
+                docs: 'https://docs.alchemy.com/',
+                needsKey: true
+            }
+        };
+
+        // ========================================
+        // UI初期化
+        // ========================================
+        function initializeLegend() {
+            const legendContent = document.getElementById('legendContent');
+            const allChains = [...Object.keys(chainColors), ...Object.keys(customChains)];
+            
+            legendContent.innerHTML = allChains
+                .filter(chain => !['usdt', 'usdc', 'other'].includes(chain))
+                .map(chain => {
+                    const color = customChains[chain]?.color || chainColors[chain];
+                    const name = customChains[chain]?.name || chain.toUpperCase();
+                    return `
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: ${color};"></div>
+                            <span>${name}</span>
+                        </div>
+                    `;
+                }).join('') + `
+                <div class="legend-item">
+                    <div class="legend-color" style="background: ${chainColors.usdt};"></div>
+                    <span>USDT</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: ${chainColors.usdc};"></div>
+                    <span>USDC</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: ${chainColors.other};"></div>
+                    <span>その他トークン</span>
+                </div>
+            `;
+        }
+
+        function updateTokenSelectVisibility() {
+            const chain = document.getElementById('chainSelect').value;
+            const tokenGroup = document.getElementById('tokenSelectGroup');
+            
+            if (utxoChains.includes(chain)) {
+                tokenGroup.style.display = 'none';
+            } else {
+                tokenGroup.style.display = 'flex';
+            }
+        }
+
+        function renderApiGrid() {
+            const apiGrid = document.getElementById('apiGrid');
+            apiGrid.innerHTML = Object.entries(apiConfigs).map(([key, config]) => `
+                <div class="api-card" data-api="${key}">
+                    <div class="api-card-title">${config.name}</div>
+                    <div class="api-card-chains">対応: ${config.chains.map(c => c.toUpperCase()).join(', ')}</div>
+                    <div class="api-card-desc">
+                        ${getApiDescription(key)}
+                    </div>
+                    <span class="api-card-status ${config.needsKey ? 'status-free' : 'status-free'}">
+                        ${config.needsKey ? '無料プランあり (要APIキー)' : '認証不要'}
+                    </span>
+                </div>
+            `).join('');
+
+            // カードクリックイベント
+            document.querySelectorAll('.api-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.api-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    selectedApi = card.dataset.api;
+                });
+            });
+        }
+
+        function getApiDescription(apiKey) {
+            const descriptions = {
+                etherscan: 'Ethereumブロックチェーンの最も人気のあるエクスプローラー。詳細なトランザクション情報を提供。',
+                polygonscan: 'Polygon専用のブロックチェーンエクスプローラー。Etherscanと同様の使いやすさ。',
+                bscscan: 'Binance Smart Chain専用。BEP-20トークンやDeFiプロトコルを追跡。',
+                basescan: 'Base Layer 2ネットワーク専用。Coinbase開発の高速チェーン。',
+                arbiscan: 'Arbitrum Layer 2ネットワーク専用。高速で低コストなトランザクション。',
+                optimistic: 'Optimism Layer 2ネットワーク専用。Ethereum互換で低コスト。',
+                blockchain: 'Bitcoin専用の老舗ブロックエクスプローラー。BTCトランザクション追跡に最適。',
+                solscan: 'Solana専用のブロックエクスプローラー。高速トランザクション追跡。',
+                tronscan: 'Tron専用のブロックチェーンエクスプローラー。TRX・TRC20トークンを追跡。',
+                blockchair: 'マルチチェーン対応のユニバーサルエクスプローラー。複数チェーンを横断検索。',
+                moralis: 'Web3開発者向けのオールインワンAPI。NFT、トークン、DeFiデータも取得可能。',
+                alchemy: 'エンタープライズグレードのブロックチェーンAPI。高速で信頼性が高い。'
+            };
+            return descriptions[apiKey] || '';
+        }
+
+        // ========================================
+        // パーティクルエフェクト
+        // ========================================
+        const particleCanvas = document.getElementById('particles');
+        const pctx = particleCanvas.getContext('2d');
+        particleCanvas.width = window.innerWidth;
+        particleCanvas.height = window.innerHeight;
+
+        const particles = [];
+        const particleCount = 50;
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * particleCanvas.width;
+                this.y = Math.random() * particleCanvas.height;
+                this.size = Math.random() * 4 + 3;
+                this.speedX = Math.random() * 2 - 1;
+                this.speedY = Math.random() * 2 - 1;
+                this.opacity = Math.random() * 0.5 + 0.3;
+                this.color = ['#00ffff', '#ff00ff', '#00ff88', '#ff0088'][Math.floor(Math.random() * 4)];
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x > particleCanvas.width) this.x = 0;
+                if (this.x < 0) this.x = particleCanvas.width;
+                if (this.y > particleCanvas.height) this.y = 0;
+                if (this.y < 0) this.y = particleCanvas.height;
+            }
+
+            draw() {
+                pctx.fillStyle = this.color;
+                pctx.globalAlpha = this.opacity;
+                pctx.beginPath();
+                pctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                pctx.fill();
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            pctx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 150) {
+                        pctx.strokeStyle = particles[i].color;
+                        pctx.globalAlpha = 0.1 * (1 - distance / 150);
+                        pctx.lineWidth = 1;
+                        pctx.beginPath();
+                        pctx.moveTo(particles[i].x, particles[i].y);
+                        pctx.lineTo(particles[j].x, particles[j].y);
+                        pctx.stroke();
+                    }
+                }
+            }
+
+            requestAnimationFrame(animateParticles);
+        }
+
+        animateParticles();
+
+        // ========================================
+        // マインドマップ描画
+        // ========================================
+        const canvas = document.getElementById('mindmapCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+
+        let nodes = [];
+        let edges = [];
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let lastX = 0;
+        let lastY = 0;
+        let scale = 1;
+
+        class Node {
+            constructor(address, x, y, chain, tokenType, level = 0, balance = null) {
+                this.address = address;
+                this.x = x;
+                this.y = y;
+                this.chain = chain;
+                this.tokenType = tokenType;
+                this.level = level;
+                this.balance = balance || (Math.random() * 100).toFixed(4);
+                this.txCount = Math.floor(Math.random() * 1000);
+                this.radius = 30;
+                this.color = this.getColor();
+                this.label = this.formatAddress(address);
+            }
+
+            getColor() {
+                if (this.tokenType === 'usdt') return chainColors.usdt;
+                if (this.tokenType === 'usdc') return chainColors.usdc;
+                return customChains[this.chain]?.color || chainColors[this.chain] || chainColors.other;
+            }
+
+            formatAddress(addr) {
+                if (addr.length > 12) {
+                    return addr.substring(0, 6) + '...' + addr.substring(addr.length - 4);
+                }
+                return addr;
+            }
+
+            draw() {
+                const screenX = this.x * scale + offsetX;
+                const screenY = this.y * scale + offsetY;
+
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = this.color;
+
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, this.radius * scale, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.hexToRgb(this.color)}, 0.3)`;
+                ctx.fill();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `${12 * scale}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(this.label, screenX, screenY + this.radius * scale + 20);
+            }
+
+            hexToRgb(hex) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `${r}, ${g}, ${b}`;
+            }
+
+            isPointInside(x, y) {
+                const screenX = this.x * scale + offsetX;
+                const screenY = this.y * scale + offsetY;
+                const distance = Math.sqrt((x - screenX) ** 2 + (y - screenY) ** 2);
+                return distance < this.radius * scale;
+            }
+        }
+
+        class Edge {
+            constructor(from, to) {
+                this.from = from;
+                this.to = to;
+            }
+
+            draw() {
+                const fromX = this.from.x * scale + offsetX;
+                const fromY = this.from.y * scale + offsetY;
+                const toX = this.to.x * scale + offsetX;
+                const toY = this.to.y * scale + offsetY;
+
+                ctx.beginPath();
+                ctx.moveTo(fromX, fromY);
+                ctx.lineTo(toX, toY);
+                ctx.strokeStyle = `rgba(0, 255, 255, 0.3)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                const angle = Math.atan2(toY - fromY, toX - fromX);
+                const arrowLength = 15;
+                ctx.beginPath();
+                ctx.moveTo(toX, toY);
+                ctx.lineTo(
+                    toX - arrowLength * Math.cos(angle - Math.PI / 6),
+                    toY - arrowLength * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.lineTo(
+                    toX - arrowLength * Math.cos(angle + Math.PI / 6),
+                    toY - arrowLength * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.closePath();
+                ctx.fillStyle = `rgba(0, 255, 255, 0.5)`;
+                ctx.fill();
+            }
+        }
+
+        function drawMindmap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            edges.forEach(edge => edge.draw());
+            nodes.forEach(node => node.draw());
+        }
+
+        // ========================================
+        // API連携関数（次のステップで実装）
+        // ========================================
+        async function fetchTransactionsFromAPI(address, chain, tokenType) {
+            // TODO: 実際のAPI呼び出しを実装
+            // この部分は次のステップで詳しく説明します
+            console.log('API呼び出し:', { address, chain, tokenType });
+            
+            // 現在はデモデータを返す
+            return generateDemoData(address, chain, tokenType);
+        }
+
+        function generateDemoData(address, chain, tokenType) {
+            nodes = [];
+            edges = [];
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            const centerNode = new Node(address, centerX, centerY, chain, tokenType, 0);
+            nodes.push(centerNode);
+
+            const angleStep = (Math.PI * 2) / 6;
+            const radius = 200;
+
+            for (let i = 0; i < 6; i++) {
+                const angle = angleStep * i;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                
+                const subAddress = '0x' + Math.random().toString(16).substring(2, 42);
+                const subNode = new Node(subAddress, x, y, chain, tokenType, 1);
+                nodes.push(subNode);
+                edges.push(new Edge(centerNode, subNode));
+
+                if (i < 3) {
+                    const subAngleStep = (Math.PI * 2) / 4;
+                    const subRadius = 150;
+                    
+                    for (let j = 0; j < 3; j++) {
+                        const subAngle = angle + subAngleStep * j - Math.PI / 2;
+                        const subX = x + Math.cos(subAngle) * subRadius;
+                        const subY = y + Math.sin(subAngle) * subRadius;
+                        
+                        const subSubAddress = '0x' + Math.random().toString(16).substring(2, 42);
+                        const subSubNode = new Node(subSubAddress, subX, subY, chain, tokenType, 2);
+                        nodes.push(subSubNode);
+                        edges.push(new Edge(subNode, subSubNode));
+                    }
+                }
+            }
+
+            drawMindmap();
+        }
+
+        // ========================================
+        // イベントハンドラー
+        // ========================================
+
+        // チェーン選択変更時
+        document.getElementById('chainSelect').addEventListener('change', updateTokenSelectVisibility);
+
+        // Canvas操作
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const deltaX = e.clientX - lastX;
+                const deltaY = e.clientY - lastY;
+                offsetX += deltaX;
+                offsetY += deltaY;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                drawMindmap();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (!isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                nodes.forEach(node => {
+                    if (node.isPointInside(x, y)) {
+                        showInfoPanel(node);
+                    }
+                });
+            }
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            scale *= delta;
+            scale = Math.max(0.3, Math.min(scale, 3));
+            drawMindmap();
+        });
+
+        function showInfoPanel(node) {
+            const panel = document.getElementById('infoPanel');
+            const content = document.getElementById('infoPanelContent');
+
+            content.innerHTML = `
+                <div class="info-item">
+                    <span class="info-label">アドレス</span>
+                    <div class="info-value">${node.address}</div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">チェーン</span>
+                    <div class="info-value">${node.chain.toUpperCase()}</div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">トークン種別</span>
+                    <div class="info-value">${node.tokenType.toUpperCase()}</div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">残高</span>
+                    <div class="info-value">${node.balance} ${node.tokenType.toUpperCase()}</div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">トランザクション数</span>
+                    <div class="info-value">${node.txCount} 件</div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">最終更新</span>
+                    <div class="info-value">${new Date().toLocaleString('ja-JP')}</div>
+                </div>
+                <button class="explore-btn" onclick="exploreFromNode('${node.address}', '${node.chain}', '${node.tokenType}')">
+                    🔍 このアドレスから探索
+                </button>
+            `;
+
+            panel.classList.add('show');
+        }
+
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            document.getElementById('infoPanel').classList.remove('show');
+        });
+
+        document.getElementById('exploreBtn').addEventListener('click', async () => {
+            const address = document.getElementById('addressInput').value;
+            const chain = document.getElementById('chainSelect').value;
+            const token = document.getElementById('tokenSelect').value;
+
+            if (!address) {
+                alert('アドレスを入力してください');
+                return;
+            }
+
+            if (!currentApiConfig.provider) {
+                alert('API設定を行ってください');
+                document.getElementById('apiModal').classList.add('show');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('show');
+            
+            try {
+                await fetchTransactionsFromAPI(address, chain, token);
+            } catch (error) {
+                alert('エラーが発生しました: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        });
+
+        window.exploreFromNode = function(address, chain, tokenType) {
+            document.getElementById('infoPanel').classList.remove('show');
+            document.getElementById('loading').classList.add('show');
+            
+            setTimeout(async () => {
+                await fetchTransactionsFromAPI(address, chain, tokenType);
+                document.getElementById('loading').classList.remove('show');
+            }, 500);
+        };
+
+        // API設定モーダル
+        document.getElementById('apiConfigBtn').addEventListener('click', () => {
+            renderApiGrid();
+            document.getElementById('apiModal').classList.add('show');
+        });
+
+        document.getElementById('apiModalClose').addEventListener('click', () => {
+            document.getElementById('apiModal').classList.remove('show');
+        });
+
+        document.getElementById('apiCancelBtn').addEventListener('click', () => {
+            document.getElementById('apiModal').classList.remove('show');
+        });
+
+        document.getElementById('apiSaveBtn').addEventListener('click', () => {
+            if (!selectedApi) {
+                alert('APIを選択してください');
+                return;
+            }
+
+            const config = apiConfigs[selectedApi];
+            const key = document.getElementById('apiKeyInput').value.trim();
+            
+            if (config.needsKey && !key) {
+                alert('このAPIにはAPIキーが必要です');
+                return;
+            }
+
+            currentApiConfig = {
+                name: config.name,
+                provider: selectedApi,
+                key: key || null
+            };
+
+            // ローカルストレージに保存
+            localStorage.setItem('apiConfig', JSON.stringify(currentApiConfig));
+
+            document.getElementById('currentApi').textContent = currentApiConfig.name;
+            document.getElementById('apiModal').classList.remove('show');
+            
+            alert(`${currentApiConfig.name} の設定が完了しました！`);
+        });
+
+        // チェーン追加モーダル
+        document.getElementById('addChainBtn').addEventListener('click', () => {
+            document.getElementById('addChainModal').classList.add('show');
+        });
+
+        document.getElementById('addChainModalClose').addEventListener('click', () => {
+            document.getElementById('addChainModal').classList.remove('show');
+        });
+
+        document.getElementById('addChainCancelBtn').addEventListener('click', () => {
+            document.getElementById('addChainModal').classList.remove('show');
+        });
+
+        document.getElementById('addChainSaveBtn').addEventListener('click', () => {
+            const name = document.getElementById('customChainName').value.trim();
+            const id = document.getElementById('customChainId').value.trim().toLowerCase();
+            const api = document.getElementById('customChainApi').value.trim();
+            const color = document.getElementById('customChainColor').value;
+
+            if (!name || !id || !api) {
+                alert('すべての項目を入力してください');
+                return;
+            }
+
+            // カスタムチェーンを追加
+            customChains[id] = { name, api, color };
+            localStorage.setItem('customChains', JSON.stringify(customChains));
+
+            // セレクトボックスに追加
+            const select = document.getElementById('chainSelect');
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = `${name} (Custom)`;
+            select.appendChild(option);
+
+            // 凡例を更新
+            initializeLegend();
+
+            document.getElementById('addChainModal').classList.remove('show');
+            alert(`${name} を追加しました！`);
+        });
+
+        // PDF出力
+        document.getElementById('exportPdfBtn').addEventListener('click', () => {
+            if (nodes.length === 0) {
+                alert('まずアドレスを探索してください');
+                return;
+            }
+
+            const exportData = {
+                nodes: nodes.map(node => ({
+                    address: node.address,
+                    chain: node.chain,
+                    tokenType: node.tokenType,
+                    balance: node.balance,
+                    txCount: node.txCount,
+                    level: node.level
+                })),
+                edges: edges.map(edge => ({
+                    from: edge.from.address,
+                    to: edge.to.address
+                })),
+                metadata: {
+                    exportDate: new Date().toISOString(),
+                    apiUsed: currentApiConfig.name,
+                    totalNodes: nodes.length,
+                    totalEdges: edges.length
+                }
+            };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `blockchain_explorer_${new Date().getTime()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+
+            alert('エクスポートデータを保存しました。\ngenerate_pdf.py スクリプトでPDF化できます。');
+        });
+
+        // リサイズ対応
+        window.addEventListener('resize', () => {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            particleCanvas.width = window.innerWidth;
+            particleCanvas.height = window.innerHeight;
+            drawMindmap();
+        });
+
+        // ========================================
+        // 初期化
+        // ========================================
+        
+        // 保存されたAPI設定を復元
+        const savedApiConfig = localStorage.getItem('apiConfig');
+        if (savedApiConfig) {
+            currentApiConfig = JSON.parse(savedApiConfig);
+            document.getElementById('currentApi').textContent = currentApiConfig.name;
+        }
+
+        // カスタムチェーンを復元
+        Object.entries(customChains).forEach(([id, config]) => {
+            const select = document.getElementById('chainSelect');
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = `${config.name} (Custom)`;
+            select.appendChild(option);
+        });
+
+        // 初期化
+        initializeLegend();
+        updateTokenSelectVisibility();
+        
+        // 初期デモデータ
+        generateDemoData('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb', 'ethereum', 'native');
+    </script>
+</body>
+</html>
