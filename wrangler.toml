@@ -1,0 +1,31 @@
+# wrangler.toml — Cloudflare Workers 設定
+# ドキュメント: https://developers.cloudflare.com/workers/
+
+name               = "cryptrace-api"
+main               = "worker/index.js"
+compatibility_date = "2024-09-23"
+
+# 静的ファイルを Workers と同一オリジンで配信
+[site]
+bucket = "./public"
+
+# 公開してよい設定値のみここに書く（APIキーは絶対に書かない）
+[vars]
+ENVIRONMENT = "production"
+
+# 開発サーバー設定（wrangler dev）
+[dev]
+port           = 8787        # wrangler dev のデフォルトポート
+local_protocol = "http"
+ip             = "0.0.0.0"  # Codespaces でのポート転送に必要
+
+# ── APIキー（Secrets）の設定方法 ─────────────────────────
+#
+# 本番デプロイ時:
+#   npx wrangler secret put ETHERSCAN_API_KEY
+#   npx wrangler secret put COINGECKO_API_KEY
+#
+# ローカル開発時:
+#   .dev.vars ファイルに書く（.gitignore 済み）
+#   ETHERSCAN_API_KEY=実際のキー
+#   COINGECKO_API_KEY=実際のキー
