@@ -219,7 +219,7 @@
         
         /* ホバーツールチップ */
         .tooltip {
-            position: absolute;
+            position: fixed;
             background: rgba(15, 15, 25, 0.98);
             border: 2px solid rgba(0, 255, 255, 0.6);
             border-radius: 12px;

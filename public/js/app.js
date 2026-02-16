@@ -42,10 +42,37 @@ const ctx = canvas.getContext('2d');
 const particleCanvas = document.getElementById('particles');
 const particleCtx = particleCanvas.getContext('2d');
 
+// DOM要素への参照（ツールチップと情報パネル用）
+const tooltip = document.getElementById('tooltip');
+const infoPanel = document.getElementById('infoPanel');
+
+// ツールチップ表示のタイムアウト管理
+let tooltipTimeout = null;
+
 canvas.width = canvas.offsetWidth;
 canvas.height = canvas.offsetHeight;
 particleCanvas.width = window.innerWidth;
 particleCanvas.height = window.innerHeight;
+
+// トークン残高を取得する関数
+async function fetchTokenBalances(address, chainId) {
+    try {
+        const chainKey = Object.keys(CHAIN_CONFIGS).find(key => CHAIN_CONFIGS[key].chainId === chainId);
+        if (!chainKey) {
+            console.warn('Unknown chainId:', chainId);
+            return [];
+        }
+        
+        const result = await API.getBalances(address, chainKey);
+        if (result.ok && result.data) {
+            return result.data.slice(0, 5); // 最大5件
+        }
+        return [];
+    } catch (error) {
+        console.error('トークン残高取得エラー:', error);
+        return [];
+    }
+}
 
 // パーティクル背景
 const particles = [];
@@ -250,16 +277,21 @@ class Node {
     }
     
     // CEX/DEXとしてマークする（非同期判定後に呼び出し）
-    markAsCexDex(name) {
+    markAsCexDex(name, exchangeType = null) {
         this.isCexDex = true;
         this.cexDexName = name;
+        this.exchangeType = exchangeType; // 'CEX' | 'DEX' | 'Contract' | null
         this.color = this.getColor();
-        console.log('🏦 ノードをCEX/DEXとしてマーク:', this.address.substring(0, 10) + '...', '→', name);
+        console.log('🏦 ノードをCEX/DEXとしてマーク:', this.address.substring(0, 10) + '...', '→', name, exchangeType);
     }
 
     getColor() {
         if (this.isCenter) return '#00ffff';
-        if (this.isCexDex) return '#ffaa00'; // CEX/DEXはオレンジ色
+        if (this.isCexDex) {
+            if (this.exchangeType === 'CEX') return '#ff8800'; // CEXはオレンジ
+            if (this.exchangeType === 'DEX') return '#00cc44'; // DEXは緑
+            return '#ffaa00'; // 不明はデフォルト
+        }
         return this.value > 1 ? '#ff00ff' : '#0088ff';
     }
 
@@ -549,11 +581,11 @@ async function detectCexDexNodes(nodeList, chainId) {
             continue;
         }
         
-        // getExchangeName関数を使って判定（CoinGecko統合済み）
-        const exchangeName = await getExchangeName(node.address, chainId);
+        // API経由でCEX/DEX判定（Cloudflare Workers）
+        const result = await API.getContract(node.address, chainId);
         
-        if (exchangeName) {
-            node.markAsCexDex(exchangeName);
+        if (result?.isCexDex) {
+            node.markAsCexDex(result.label, result.exchangeType);
             detectedCount++;
             
             // UIを更新
@@ -588,20 +620,33 @@ function showTooltip(node, mouseX, mouseY) {
     const title = document.getElementById('tooltipTitle');
     const content = document.getElementById('tooltipContent');
     
-    // CEX/DEXの場合はタイトルを変更
+    // CEX/DEXの場合はタイトルと色を変更
+    const typeEmoji = { CEX: '🏛️', DEX: '🔄', Contract: '📄' };
+    const typeColor = { CEX: '#ff8800', DEX: '#00cc44', Contract: '#8888ff' };
     if (node.isCexDex) {
-        title.textContent = node.cexDexName ? `🏦 ${node.cexDexName}` : '🏦 CEX/DEX';
+        const emoji = typeEmoji[node.exchangeType] || '🏦';
+        const name  = node.cexDexName || node.exchangeType || 'CEX/DEX';
+        title.textContent = `${emoji} ${name}`;
+    } else if (node.exchangeType === 'Contract') {
+        title.textContent = `📄 ${node.cexDexName || 'コントラクト'}`;
     } else {
-        title.textContent = node.isCenter ? '中心ノード' : 'トランザクション';
+        title.textContent = node.isCenter ? '🎯 中心アドレス' : '👤 ウォレット';
     }
-    
+
     // CEX/DEXラベルを追加
-    const cexDexLabel = node.isCexDex ? `
-        <div class="tooltip-row" style="background: rgba(255, 170, 0, 0.1); padding: 5px; border-radius: 5px; margin-bottom: 8px;">
-            <span class="tooltip-label" style="color: #ffaa00;">種別:</span>
-            <span class="tooltip-value" style="color: #ffaa00; font-weight: bold;">取引所/DEX</span>
-        </div>
-    ` : '';
+    let cexDexLabel = '';
+    if (node.isCexDex || node.exchangeType) {
+        const t = node.exchangeType || 'CEX/DEX';
+        const c = typeColor[t] || '#ffaa00';
+        const label = node.isCexDex
+            ? (t === 'CEX' ? '中央集権取引所 (CEX)' : t === 'DEX' ? '分散型取引所 (DEX)' : t)
+            : 'スマートコントラクト';
+        cexDexLabel = `
+        <div class="tooltip-row" style="background: rgba(255,170,0,0.08); padding: 5px; border-radius: 5px; margin-bottom: 8px;">
+            <span class="tooltip-label" style="color:${c};">種別:</span>
+            <span class="tooltip-value" style="color:${c}; font-weight:bold;">${label}</span>
+        </div>`;
+    }
     
     content.innerHTML = `
         ${cexDexLabel}
@@ -736,7 +781,14 @@ document.getElementById('exploreBtn').addEventListener('click', async () => {
         console.log('🌐 API呼び出し開始');
         const transactions = await API.getTransactions(address, chainId, limit, tokenType, tokenAddress);
         console.log('✅ トランザクション取得成功:', transactions.length, '件');
-        
+
+        if (!transactions || transactions.length === 0) {
+            updateStatusIndicator('ready', 'トランザクションが見つかりませんでした');
+            showError('結果なし', 'トランザクションが見つかりませんでした',
+                'このアドレスには取引履歴がないか、コントラクトアドレスの可能性があります。\n別のアドレスやトークンタイプを試してください。');
+            return;
+        }
+
         console.log('🗺️ マインドマップ構築開始');
         buildMindmap(address, chainId, transactions);
         console.log('✅ マインドマップ構築完了');
@@ -1010,7 +1062,6 @@ document.getElementById('headerToggle').addEventListener('click', () => {
 });
 
 // 情報パネルのスワイプで閉じる機能（モバイル用）
-const infoPanel = document.getElementById('infoPanel');
 let panelTouchStartY = 0;
 let panelTouchCurrentY = 0;
 let isPanelSwiping = false;
@@ -1057,7 +1108,7 @@ async function showInfoPanel(node) {
     // CEX/DEX名を取得（既に判定済みの場合はそれを使用、未判定の場合は非同期で取得）
     let exchangeName = node.cexDexName; // 既に判定済みの名前を優先
     if (!exchangeName && node.isCexDex) {
-        exchangeName = await API.getContract(node.address, node.chainId).then(r => r?.label ?? null);
+        exchangeName = await API.getContract(node.address, node.chainId).then(r => { if(r?.isCexDex) node.exchangeType = r.exchangeType; return r?.label ?? null; });
     }
     
     const exchangeLabel = exchangeName ? `<div class="info-item">
@@ -1211,7 +1262,7 @@ async function showAddressDetails(node) {
     const content = document.getElementById('infoPanelContent');
     
     // CEX/DEX名を取得（非同期）
-    const exchangeName = await API.getContract(node.address, node.chainId).then(r => r?.label ?? null);
+    const exchangeName = await API.getContract(node.address, node.chainId).then(r => { if(r?.isCexDex) node.exchangeType = r.exchangeType; return r?.label ?? null; });
     const exchangeBadge = exchangeName ? `<div style="display: inline-block; background: rgba(255, 170, 0, 0.2); color: #ffaa00; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-top: 5px;">🏦 ${exchangeName}</div>` : '';
     
     content.innerHTML = `
@@ -1543,7 +1594,7 @@ async function runTokenSearch() {
     try {
         if (searchMethod === 'address') {
             if (!searchInput.match(/^0x[a-fA-F0-9]{40}$/)) throw new Error('正しいトークンアドレスを入力してください (0x...)');
-            const const _r = await API.searchToken(searchInput, chainId, "address"); const token = _r[0];
+            const _r = await API.searchToken(searchInput, chainId, "address"); const token = _r[0];
             showTokenResult(token, infoDisplay);
         } else {
             const tokens = await API.searchToken(searchInput, chainId, "symbol");
@@ -1632,6 +1683,47 @@ const resizeObserver = new ResizeObserver(entries => {
     }
 });
 resizeObserver.observe(canvas.parentElement);
+
+// ビューリセットボタン
+document.getElementById('resetViewBtn').addEventListener('click', () => {
+    console.log('🎯 ビューをリセット');
+    scale = 1;
+    offsetX = 0;
+    offsetY = 0;
+    drawMindmap();
+});
+
+// リセットボタン
+document.getElementById('resetBtn').addEventListener('click', () => {
+    console.log('🔄 アプリをリセット');
+    // グラフをクリア
+    nodes = [];
+    edges = [];
+    selectedNode = null;
+    hoveredNode = null;
+    selectedToken = null;
+    
+    // 入力フィールドをクリア
+    document.getElementById('addressInput').value = '';
+    document.getElementById('limitSelect').value = '20';
+    document.getElementById('tokenTypeSelect').value = 'native';
+    document.getElementById('tokenSelectGroup').style.display = 'none';
+    document.getElementById('selectedTokenInfo').style.display = 'none';
+    
+    // パネルを閉じる
+    document.getElementById('infoPanel').classList.remove('show');
+    hideTooltip();
+    
+    // ビューをリセット
+    scale = 1;
+    offsetX = 0;
+    offsetY = 0;
+    
+    // キャンバスをクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    console.log('✅ リセット完了');
+});
 
 console.log('CrypTrace initialized - Mobile-Ready Version');
 console.log('✅ 探索ボタンイベントリスナー設定完了');
