@@ -1446,8 +1446,13 @@ setTimeout(() => {
     const selectTokenBtn = document.getElementById('selectTokenBtn');
     if (selectTokenBtn) {
         selectTokenBtn.addEventListener('click', () => {
-            initializeTokenList();
+            // 先にモーダルを表示
             document.getElementById('tokenModal').style.display = 'flex';
+            
+            // 少し遅延してから要素を操作（DOMが確実に表示されてから）
+            setTimeout(() => {
+                initializeTokenList();
+            }, 10);
         });
         console.log('✅ トークン選択ボタンのイベントリスナー設定完了');
     } else {
@@ -1470,6 +1475,13 @@ setTimeout(() => {
 function initializeTokenList() {
     const chainId = document.getElementById('chainSelect').value;
     const tokenList = document.getElementById('tokenList');
+    
+    // 要素が存在しない場合は終了
+    if (!tokenList) {
+        console.error('❌ tokenList要素が見つかりません');
+        return;
+    }
+    
     const allTokens = PRESET_TOKENS[chainId] || [];
     
     // デフォルトでは最初の3トークンのみ表示（USDT, USDC, USDI/USD1）
