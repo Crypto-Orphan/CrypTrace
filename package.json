@@ -1,0 +1,16 @@
+{
+  "name": "cryptrace",
+  "version": "1.0.0",
+  "description": "Blockchain Explorer with Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": ["blockchain", "ethereum", "explorer"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.114.0"
+  }
+}
