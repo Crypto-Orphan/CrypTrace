@@ -328,8 +328,8 @@
         .legend-item {
             display: flex;
             align-items: center;
-            margin-bottom: 8px;
-            font-size: 12px;
+            gap: 12px;
+            margin-bottom: 10px;
         }
         .legend-icon {
             width: 20px;
@@ -661,3 +661,19 @@
                 font-size: 11px;
             }
         }
+
+/* 凡例アイテムの縦揃え修正 */
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.legend-item > div:first-child {
+    flex-shrink: 0; /* アイコンサイズ固定 */
+}
+
+.legend-label {
+    flex: 1;
+}

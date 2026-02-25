@@ -898,3 +898,1231 @@ buildGraphAppend = function(address, txs, sourceNode) {
 };
 
 console.log('✅ Phase 4.3: 取引所判定（六角形） 完了');
+
+// Nodeに資産情報プロパティ追加
+Node.prototype.totalBalanceUSD = 0;
+Node.prototype.tokens = [];
+Node.prototype.baseRadius = 20;
+Node.prototype.minRadius = 15;
+Node.prototype.maxRadius = 50;
+
+// 資産量からサイズを計算
+Node.prototype.updateSizeFromBalance = function() {
+    if (this.totalBalanceUSD === 0) {
+        this.radius = this.baseRadius;
+        return;
+    }
+    
+    // 対数スケール
+    const logBalance = Math.log10(Math.max(100, this.totalBalanceUSD));
+    const logMin = Math.log10(100);      // $100
+    const logBase = Math.log10(10000);   // $10,000
+    const logMax = Math.log10(1000000);  // $1,000,000
+    
+    let normalized;
+    
+    if (this.totalBalanceUSD < 10000) {
+        normalized = (logBalance - logMin) / (logBase - logMin);
+        this.radius = this.minRadius + (this.baseRadius - this.minRadius) * normalized;
+    } else {
+        normalized = Math.min(1, (logBalance - logBase) / (logMax - logBase));
+        this.radius = this.baseRadius + (this.maxRadius - this.baseRadius) * normalized;
+    }
+    
+    console.log(`資産: $${this.totalBalanceUSD.toFixed(2)} → サイズ: ${this.radius.toFixed(1)}px`);
+};
+
+// 資産情報を設定
+Node.prototype.setBalance = function(tokens, totalUSD) {
+    this.tokens = tokens;
+    this.totalBalanceUSD = totalUSD;
+    this.updateSizeFromBalance();
+};
+
+console.log('✅ Phase 5.1: 資産連動サイズ基盤 完了');
+
+// ドラッグ機能追加
+let draggedNode = null;
+
+// 既存のmousedownイベントを上書き
+canvas?.removeEventListener('mousedown', canvas.onmousedown);
+
+canvas?.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    // ノードをクリックしたか確認
+    for (const node of nodes) {
+        const x = node.x * scale + offsetX;
+        const y = node.y * scale + offsetY;
+        const r = node.radius * scale;
+        
+        if (Math.sqrt((mx - x) ** 2 + (my - y) ** 2) <= r) {
+            // 右クリックまたはShift+クリックでドラッグ
+            if (e.button === 2 || e.shiftKey) {
+                draggedNode = node;
+                e.preventDefault();
+                return;
+            } else {
+                // 通常クリック→選択
+                selectedNode = node;
+                showInfoPanel(node);
+                drawGraph();
+                return;
+            }
+        }
+    }
+    
+    // 空白クリック→キャンバスドラッグ
+    selectedNode = null;
+    drawGraph();
+    isDragging = true;
+    dragStartX = e.clientX - offsetX;
+    dragStartY = e.clientY - offsetY;
+});
+
+// 右クリックメニュー無効化
+canvas?.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+});
+
+// mousemove更新
+canvas?.removeEventListener('mousemove', canvas.onmousemove);
+
+canvas?.addEventListener('mousemove', (e) => {
+    if (draggedNode) {
+        const rect = canvas.getBoundingClientRect();
+        draggedNode.x = (e.clientX - rect.left - offsetX) / scale;
+        draggedNode.y = (e.clientY - rect.top - offsetY) / scale;
+        draggedNode.vx = 0;
+        draggedNode.vy = 0;
+        draggedNode.fx = 0;
+        draggedNode.fy = 0;
+        drawGraph();
+    } else if (isDragging) {
+        offsetX = e.clientX - dragStartX;
+        offsetY = e.clientY - dragStartY;
+        drawGraph();
+    }
+});
+
+// mouseup更新
+canvas?.removeEventListener('mouseup', canvas.onmouseup);
+
+canvas?.addEventListener('mouseup', () => {
+    draggedNode = null;
+    isDragging = false;
+});
+
+console.log('✅ 修正: ノードドラッグ機能追加（右クリックまたはShift+クリック）');
+
+// ドラッグ操作を完全に作り直し
+canvas.onmousedown = null;
+canvas.onmousemove = null;
+canvas.onmouseup = null;
+
+// 新しいドラッグシステム
+canvas.addEventListener('mousedown', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    // ノードをクリックしたか確認
+    for (const node of nodes) {
+        const x = node.x * scale + offsetX;
+        const y = node.y * scale + offsetY;
+        const r = node.radius * scale;
+        
+        if (Math.sqrt((mx - x) ** 2 + (my - y) ** 2) <= r) {
+            draggedNode = node;
+            isDragging = false; // キャンバスドラッグを無効化
+            
+            // 選択状態も更新
+            selectedNode = node;
+            showInfoPanel(node);
+            drawGraph();
+            
+            e.preventDefault();
+            return;
+        }
+    }
+    
+    // 空白クリック→キャンバスドラッグ
+    selectedNode = null;
+    drawGraph();
+    isDragging = true;
+    dragStartX = e.clientX - offsetX;
+    dragStartY = e.clientY - offsetY;
+});
+
+canvas.addEventListener('mousemove', function(e) {
+    if (draggedNode) {
+        // ノードドラッグ
+        const rect = canvas.getBoundingClientRect();
+        draggedNode.x = (e.clientX - rect.left - offsetX) / scale;
+        draggedNode.y = (e.clientY - rect.top - offsetY) / scale;
+        draggedNode.vx = 0;
+        draggedNode.vy = 0;
+        drawGraph(); // 物理演算を止めて即座に描画
+    } else if (isDragging) {
+        // キャンバスドラッグ
+        offsetX = e.clientX - dragStartX;
+        offsetY = e.clientY - dragStartY;
+        drawGraph();
+    }
+});
+
+canvas.addEventListener('mouseup', function() {
+    draggedNode = null;
+    isDragging = false;
+});
+
+console.log('✅ 修正: 個別ノードドラッグ対応');
+
+// buildGraphとbuildGraphAppendのエッジ距離を2倍に
+buildGraph = function(address, txs) {
+    nodes = [];
+    edges = [];
+    
+    const center = new Node(address, canvas.width / 2, canvas.height / 2);
+    center.color = '#00ffff';
+    center.radius = 30;
+    nodes.push(center);
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        const angle = (i / txs.length) * Math.PI * 2;
+        const node = new Node(addr, center.x + Math.cos(angle) * 400, center.y + Math.sin(angle) * 400); // 200→400
+        nodes.push(node);
+        edges.push(new Edge(center, node));
+    });
+    
+    startPhysics();
+    detectExchanges();
+    console.log('マップ生成:', nodes.length, 'ノード');
+};
+
+buildGraphAppend = function(address, txs, sourceNode) {
+    let centerNode = findNode(address);
+    
+    if (!centerNode) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 400;
+        centerNode = new Node(
+            address,
+            sourceNode.x + Math.cos(angle) * distance,
+            sourceNode.y + Math.sin(angle) * distance
+        );
+        nodes.push(centerNode);
+    }
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        let node = findNode(addr);
+        
+        if (!node) {
+            const angle = (i / txs.length) * Math.PI * 2;
+            const distance = 400; // 200→400
+            node = new Node(
+                addr,
+                centerNode.x + Math.cos(angle) * distance,
+                centerNode.y + Math.sin(angle) * distance
+            );
+            nodes.push(node);
+        }
+        
+        if (!edgeExists(centerNode, node)) {
+            edges.push(new Edge(centerNode, node));
+        }
+    });
+    
+    detectExchanges();
+};
+
+// 物理演算の理想距離も2倍に
+updatePhysics = function() {
+    nodes.forEach(n => n.resetForce());
+    
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+            const nodeA = nodes[i];
+            const nodeB = nodes[j];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const minDistance = (nodeA.radius + nodeB.radius) * 2.5;
+            
+            if (distance < minDistance) {
+                const force = (minDistance - distance) / distance * 0.8;
+                const fx = dx * force;
+                const fy = dy * force;
+                
+                nodeA.applyForce(-fx, -fy);
+                nodeB.applyForce(fx, fy);
+            }
+            
+            const repulsion = 500 / (distance * distance);
+            const fx = (dx / distance) * repulsion;
+            const fy = (dy / distance) * repulsion;
+            
+            nodeA.applyForce(-fx, -fy);
+            nodeB.applyForce(fx, fy);
+        }
+    }
+    
+    edges.forEach(edge => {
+        const dx = edge.to.x - edge.from.x;
+        const dy = edge.to.y - edge.from.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        const idealDistance = 300; // 150→300
+        const force = (distance - idealDistance) * 0.003;
+        const fx = (dx / distance) * force;
+        const fy = (dy / distance) * force;
+        
+        edge.from.applyForce(fx, fy);
+        edge.to.applyForce(-fx, -fy);
+    });
+    
+    nodes.forEach(n => n.update());
+    
+    drawGraph();
+    animationFrameId = requestAnimationFrame(updatePhysics);
+};
+
+console.log('✅ 修正: エッジ長さを2倍に（400px）');
+
+// 資産取得してサイズ更新（バッチ処理）
+async function fetchBalancesAndUpdateSizes() {
+    console.log('💰 資産取得開始:', nodes.length, 'ノード');
+    
+    const batchSize = 5;
+    
+    for (let i = 0; i < nodes.length; i += batchSize) {
+        const batch = nodes.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (node) => {
+            try {
+                const chain = chainSelect?.value || 'ethereum';
+                const result = await API.getBalances(node.address, chain);
+                
+                if (result.ok && result.data && result.data.length > 0) {
+                    let totalUSD = 0;
+                    const tokens = [];
+                    
+                    // トップ5トークンのみ処理
+                    for (const token of result.data.slice(0, 5)) {
+                        const balance = parseFloat(token.balance) / Math.pow(10, token.tokenDecimal);
+                        
+                        // 簡易価格推定（実際の価格取得は省略）
+                        // USDT/USDC/DAIは$1、その他は仮の値
+                        let priceUSD = 0;
+                        if (['USDT', 'USDC', 'DAI', 'BUSD'].includes(token.tokenSymbol)) {
+                            priceUSD = 1;
+                        } else if (['WETH', 'ETH'].includes(token.tokenSymbol)) {
+                            priceUSD = 2500; // 仮の値
+                        } else if (['WBTC', 'BTC'].includes(token.tokenSymbol)) {
+                            priceUSD = 50000; // 仮の値
+                        }
+                        
+                        const valueUSD = balance * priceUSD;
+                        totalUSD += valueUSD;
+                        
+                        if (valueUSD > 0) {
+                            tokens.push({
+                                symbol: token.tokenSymbol,
+                                balance: balance,
+                                priceUSD: priceUSD,
+                                valueUSD: valueUSD
+                            });
+                        }
+                    }
+                    
+                    if (totalUSD > 0) {
+                        node.setBalance(tokens, totalUSD);
+                    }
+                }
+            } catch (e) {
+                // エラーは無視
+            }
+        }));
+        
+        // バッチごとに再描画
+        drawGraph();
+        
+        // レート制限対策
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log('✅ 資産取得完了');
+}
+
+// buildGraphとbuildGraphAppendの最後に追加
+buildGraph = function(address, txs) {
+    nodes = [];
+    edges = [];
+    
+    const center = new Node(address, canvas.width / 2, canvas.height / 2);
+    center.color = '#00ffff';
+    center.radius = 30;
+    nodes.push(center);
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        const angle = (i / txs.length) * Math.PI * 2;
+        const node = new Node(addr, center.x + Math.cos(angle) * 400, center.y + Math.sin(angle) * 400);
+        nodes.push(node);
+        edges.push(new Edge(center, node));
+    });
+    
+    startPhysics();
+    detectExchanges();
+    fetchBalancesAndUpdateSizes(); // 資産取得
+    console.log('マップ生成:', nodes.length, 'ノード');
+};
+
+buildGraphAppend = function(address, txs, sourceNode) {
+    let centerNode = findNode(address);
+    
+    if (!centerNode) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 400;
+        centerNode = new Node(
+            address,
+            sourceNode.x + Math.cos(angle) * distance,
+            sourceNode.y + Math.sin(angle) * distance
+        );
+        nodes.push(centerNode);
+    }
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        let node = findNode(addr);
+        
+        if (!node) {
+            const angle = (i / txs.length) * Math.PI * 2;
+            const distance = 400;
+            node = new Node(
+                addr,
+                centerNode.x + Math.cos(angle) * distance,
+                centerNode.y + Math.sin(angle) * distance
+            );
+            nodes.push(node);
+        }
+        
+        if (!edgeExists(centerNode, node)) {
+            edges.push(new Edge(centerNode, node));
+        }
+    });
+    
+    detectExchanges();
+    fetchBalancesAndUpdateSizes(); // 資産取得
+};
+
+console.log('✅ Phase 5.2: 資産取得とサイズ更新 完了');
+
+// 物理演算の引力を大幅に弱める
+updatePhysics = function() {
+    nodes.forEach(n => n.resetForce());
+    
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+            const nodeA = nodes[i];
+            const nodeB = nodes[j];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const minDistance = (nodeA.radius + nodeB.radius) * 2.5;
+            
+            if (distance < minDistance) {
+                const force = (minDistance - distance) / distance * 0.8;
+                const fx = dx * force;
+                const fy = dy * force;
+                
+                nodeA.applyForce(-fx, -fy);
+                nodeB.applyForce(fx, fy);
+            }
+            
+            const repulsion = 500 / (distance * distance);
+            const fx = (dx / distance) * repulsion;
+            const fy = (dy / distance) * repulsion;
+            
+            nodeA.applyForce(-fx, -fy);
+            nodeB.applyForce(fx, fy);
+        }
+    }
+    
+    // エッジの引力を大幅に弱める
+    edges.forEach(edge => {
+        const dx = edge.to.x - edge.from.x;
+        const dy = edge.to.y - edge.from.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        const idealDistance = 300;
+        const force = (distance - idealDistance) * 0.001; // 0.003→0.001
+        const fx = (dx / distance) * force;
+        const fy = (dy / distance) * force;
+        
+        edge.from.applyForce(fx, fy);
+        edge.to.applyForce(-fx, -fy);
+    });
+    
+    nodes.forEach(n => n.update());
+    
+    drawGraph();
+    animationFrameId = requestAnimationFrame(updatePhysics);
+};
+
+console.log('✅ 修正: 引力を1/3に弱める');
+
+// エッジ長さを4倍に（400→800）
+buildGraph = function(address, txs) {
+    nodes = [];
+    edges = [];
+    
+    const center = new Node(address, canvas.width / 2, canvas.height / 2);
+    center.color = '#00ffff';
+    center.radius = 30;
+    nodes.push(center);
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        const angle = (i / txs.length) * Math.PI * 2;
+        const node = new Node(addr, center.x + Math.cos(angle) * 800, center.y + Math.sin(angle) * 800); // 400→800
+        nodes.push(node);
+        edges.push(new Edge(center, node));
+    });
+    
+    startPhysics();
+    detectExchanges();
+    fetchBalancesAndUpdateSizes();
+    console.log('マップ生成:', nodes.length, 'ノード');
+};
+
+buildGraphAppend = function(address, txs, sourceNode) {
+    let centerNode = findNode(address);
+    
+    if (!centerNode) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 800; // 400→800
+        centerNode = new Node(
+            address,
+            sourceNode.x + Math.cos(angle) * distance,
+            sourceNode.y + Math.sin(angle) * distance
+        );
+        nodes.push(centerNode);
+    }
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        let node = findNode(addr);
+        
+        if (!node) {
+            const angle = (i / txs.length) * Math.PI * 2;
+            const distance = 800; // 400→800
+            node = new Node(
+                addr,
+                centerNode.x + Math.cos(angle) * distance,
+                centerNode.y + Math.sin(angle) * distance
+            );
+            nodes.push(node);
+        }
+        
+        if (!edgeExists(centerNode, node)) {
+            edges.push(new Edge(centerNode, node));
+        }
+    });
+    
+    detectExchanges();
+    fetchBalancesAndUpdateSizes();
+};
+
+// 物理演算の理想距離も800に
+updatePhysics = function() {
+    nodes.forEach(n => n.resetForce());
+    
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+            const nodeA = nodes[i];
+            const nodeB = nodes[j];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const minDistance = (nodeA.radius + nodeB.radius) * 2.5;
+            
+            if (distance < minDistance) {
+                const force = (minDistance - distance) / distance * 0.8;
+                const fx = dx * force;
+                const fy = dy * force;
+                
+                nodeA.applyForce(-fx, -fy);
+                nodeB.applyForce(fx, fy);
+            }
+            
+            const repulsion = 500 / (distance * distance);
+            const fx = (dx / distance) * repulsion;
+            const fy = (dy / distance) * repulsion;
+            
+            nodeA.applyForce(-fx, -fy);
+            nodeB.applyForce(fx, fy);
+        }
+    }
+    
+    edges.forEach(edge => {
+        const dx = edge.to.x - edge.from.x;
+        const dy = edge.to.y - edge.from.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        const idealDistance = 600; // 300→600
+        const force = (distance - idealDistance) * 0.0005; // さらに弱める
+        const fx = (dx / distance) * force;
+        const fy = (dy / distance) * force;
+        
+        edge.from.applyForce(fx, fy);
+        edge.to.applyForce(-fx, -fy);
+    });
+    
+    nodes.forEach(n => n.update());
+    
+    drawGraph();
+    animationFrameId = requestAnimationFrame(updatePhysics);
+};
+
+console.log('✅ 修正: エッジ長さを800pxに');
+
+// 反発力を少し強める
+updatePhysics = function() {
+    nodes.forEach(n => n.resetForce());
+    
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+            const nodeA = nodes[i];
+            const nodeB = nodes[j];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const minDistance = (nodeA.radius + nodeB.radius) * 2.5;
+            
+            if (distance < minDistance) {
+                const force = (minDistance - distance) / distance * 1.2; // 0.8→1.2
+                const fx = dx * force;
+                const fy = dy * force;
+                
+                nodeA.applyForce(-fx, -fy);
+                nodeB.applyForce(fx, fy);
+            }
+            
+            // 長距離反発力を強める
+            const repulsion = 800 / (distance * distance); // 500→800
+            const fx = (dx / distance) * repulsion;
+            const fy = (dy / distance) * repulsion;
+            
+            nodeA.applyForce(-fx, -fy);
+            nodeB.applyForce(fx, fy);
+        }
+    }
+    
+    edges.forEach(edge => {
+        const dx = edge.to.x - edge.from.x;
+        const dy = edge.to.y - edge.from.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        const idealDistance = 600;
+        const force = (distance - idealDistance) * 0.0005;
+        const fx = (dx / distance) * force;
+        const fy = (dy / distance) * force;
+        
+        edge.from.applyForce(fx, fy);
+        edge.to.applyForce(-fx, -fy);
+    });
+    
+    nodes.forEach(n => n.update());
+    
+    drawGraph();
+    animationFrameId = requestAnimationFrame(updatePhysics);
+};
+
+console.log('✅ 修正: 反発力を1.5倍に強化');
+
+// 資産取得関数を修正（詳細ログ付き）
+fetchBalancesAndUpdateSizes = async function() {
+    console.log('💰 資産取得開始:', nodes.length, 'ノード');
+    
+    const batchSize = 5;
+    
+    for (let i = 0; i < nodes.length; i += batchSize) {
+        const batch = nodes.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (node) => {
+            try {
+                const chain = chainSelect?.value || 'ethereum';
+                console.log(`📡 ${node.address.slice(0, 10)}... の残高取得中...`);
+                
+                const result = await API.getBalances(node.address, chain);
+                
+                console.log(`📦 結果:`, result);
+                
+                if (result.ok && result.data && result.data.length > 0) {
+                    console.log(`✅ トークン数: ${result.data.length}`);
+                    
+                    let totalUSD = 0;
+                    const tokens = [];
+                    
+                    for (const token of result.data.slice(0, 5)) {
+                        const balance = parseFloat(token.balance) / Math.pow(10, token.tokenDecimal);
+                        
+                        let priceUSD = 0;
+                        if (['USDT', 'USDC', 'DAI', 'BUSD'].includes(token.tokenSymbol)) {
+                            priceUSD = 1;
+                        } else if (['WETH', 'ETH'].includes(token.tokenSymbol)) {
+                            priceUSD = 2500;
+                        } else if (['WBTC', 'BTC'].includes(token.tokenSymbol)) {
+                            priceUSD = 50000;
+                        }
+                        
+                        const valueUSD = balance * priceUSD;
+                        totalUSD += valueUSD;
+                        
+                        console.log(`  ${token.tokenSymbol}: ${balance.toFixed(4)} × $${priceUSD} = $${valueUSD.toFixed(2)}`);
+                        
+                        if (valueUSD > 0) {
+                            tokens.push({
+                                symbol: token.tokenSymbol,
+                                balance: balance,
+                                priceUSD: priceUSD,
+                                valueUSD: valueUSD
+                            });
+                        }
+                    }
+                    
+                    console.log(`💰 総資産: $${totalUSD.toFixed(2)}`);
+                    
+                    if (totalUSD > 0) {
+                        node.setBalance(tokens, totalUSD);
+                        console.log(`📏 サイズ変更: ${node.radius}px`);
+                    }
+                } else {
+                    console.log(`⚠️ トークンなし`);
+                }
+            } catch (e) {
+                console.error(`❌ エラー:`, e);
+            }
+        }));
+        
+        drawGraph();
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log('✅ 資産取得完了');
+};
+
+console.log('✅ 修正: 資産取得デバッグログ追加');
+
+// デバッグ: トークンデータの構造を確認
+fetchBalancesAndUpdateSizes = async function() {
+    console.log('💰 資産取得開始:', nodes.length, 'ノード');
+    
+    const batchSize = 5;
+    
+    for (let i = 0; i < nodes.length; i += batchSize) {
+        const batch = nodes.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (node) => {
+            try {
+                const chain = chainSelect?.value || 'ethereum';
+                const result = await API.getBalances(node.address, chain);
+                
+                if (result.ok && result.data && result.data.length > 0) {
+                    console.log('📦 データ構造:', JSON.stringify(result.data[0], null, 2));
+                    
+                    let totalUSD = 0;
+                    const tokens = [];
+                    
+                    for (const token of result.data.slice(0, 5)) {
+                        // フィールド名を修正
+                        const symbol = token.symbol || token.tokenSymbol || token.tokenName;
+                        const balanceRaw = token.balance || '0';
+                        const decimals = parseInt(token.decimals || token.tokenDecimal || 18);
+                        
+                        const balance = parseFloat(balanceRaw) / Math.pow(10, decimals);
+                        
+                        let priceUSD = 0;
+                        if (['USDT', 'USDC', 'DAI', 'BUSD'].includes(symbol)) {
+                            priceUSD = 1;
+                        } else if (['WETH', 'ETH'].includes(symbol)) {
+                            priceUSD = 2500;
+                        } else if (['WBTC', 'BTC'].includes(symbol)) {
+                            priceUSD = 50000;
+                        }
+                        
+                        const valueUSD = balance * priceUSD;
+                        totalUSD += valueUSD;
+                        
+                        console.log(`  ${symbol}: ${balance.toFixed(4)} × $${priceUSD} = $${valueUSD.toFixed(2)}`);
+                        
+                        if (valueUSD > 0) {
+                            tokens.push({
+                                symbol: symbol,
+                                balance: balance,
+                                priceUSD: priceUSD,
+                                valueUSD: valueUSD
+                            });
+                        }
+                    }
+                    
+                    console.log(`💰 総資産: $${totalUSD.toFixed(2)}`);
+                    
+                    if (totalUSD > 0) {
+                        node.setBalance(tokens, totalUSD);
+                        console.log(`📏 サイズ変更: ${node.radius}px`);
+                    }
+                }
+            } catch (e) {
+                console.error(`❌ エラー:`, e);
+            }
+        }));
+        
+        drawGraph();
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log('✅ 資産取得完了');
+};
+
+console.log('✅ 修正: トークンフィールド名対応');
+
+// 資産取得関数を修正（シンボル判定を改善）
+fetchBalancesAndUpdateSizes = async function() {
+    console.log('💰 資産取得開始:', nodes.length, 'ノード');
+    
+    const batchSize = 5;
+    
+    for (let i = 0; i < nodes.length; i += batchSize) {
+        const batch = nodes.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (node) => {
+            try {
+                const chain = chainSelect?.value || 'ethereum';
+                const result = await API.getBalances(node.address, chain);
+                
+                if (result.ok && result.data && result.data.length > 0) {
+                    let totalUSD = 0;
+                    const tokens = [];
+                    
+                    for (const token of result.data.slice(0, 5)) {
+                        const symbol = token.symbol || 'Unknown';
+                        const balanceRaw = token.balance || '0';
+                        const decimals = parseInt(token.decimals || 18);
+                        const balance = parseFloat(balanceRaw) / Math.pow(10, decimals);
+                        
+                        // 正規化されたシンボル（ASCIIのみ）
+                        const normalizedSymbol = symbol.normalize('NFKC').replace(/[^\x00-\x7F]/g, '');
+                        
+                        let priceUSD = 0;
+                        
+                        // ステーブルコイン
+                        if (['USDT', 'USDC', 'DAI', 'BUSD', 'USDI'].some(s => normalizedSymbol.includes(s))) {
+                            priceUSD = 1;
+                        }
+                        // ETH系
+                        else if (['WETH', 'ETH'].includes(normalizedSymbol)) {
+                            priceUSD = 2500;
+                        }
+                        // BTC系
+                        else if (['WBTC', 'BTC'].includes(normalizedSymbol)) {
+                            priceUSD = 50000;
+                        }
+                        
+                        const valueUSD = balance * priceUSD;
+                        totalUSD += valueUSD;
+                        
+                        if (valueUSD > 0) {
+                            tokens.push({
+                                symbol: symbol,
+                                balance: balance,
+                                priceUSD: priceUSD,
+                                valueUSD: valueUSD
+                            });
+                        }
+                    }
+                    
+                    if (totalUSD > 0) {
+                        node.setBalance(tokens, totalUSD);
+                    }
+                }
+            } catch (e) {
+                console.error(`❌ エラー:`, e);
+            }
+        }));
+        
+        drawGraph();
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log('✅ 資産取得完了');
+};
+
+console.log('✅ 修正: シンボル判定改善（偽USDTを除外）');
+
+// 物理演算に衝突反発を追加
+updatePhysics = function() {
+    nodes.forEach(n => n.resetForce());
+    
+    // 1. ノード間の反発力 + 衝突反発
+    for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+            const nodeA = nodes[i];
+            const nodeB = nodes[j];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const minDistance = (nodeA.radius + nodeB.radius) * 2.5;
+            
+            // 衝突判定（実際に接触している）
+            if (distance < (nodeA.radius + nodeB.radius) * 1.2) {
+                // ビリヤード風の跳ね返り
+                const overlap = (nodeA.radius + nodeB.radius) * 1.2 - distance;
+                
+                // 位置を即座に修正（めり込み解消）
+                const moveX = (dx / distance) * overlap * 0.5;
+                const moveY = (dy / distance) * overlap * 0.5;
+                
+                nodeA.x -= moveX;
+                nodeA.y -= moveY;
+                nodeB.x += moveX;
+                nodeB.y += moveY;
+                
+                // 速度の交換（弾性衝突）
+                const relativeVx = nodeB.vx - nodeA.vx;
+                const relativeVy = nodeB.vy - nodeA.vy;
+                
+                const dotProduct = relativeVx * dx + relativeVy * dy;
+                
+                if (dotProduct < 0) { // 近づいている場合のみ
+                    const collisionScale = dotProduct / (distance * distance);
+                    
+                    const impulseX = dx * collisionScale * 0.8; // 0.8 = 反発係数
+                    const impulseY = dy * collisionScale * 0.8;
+                    
+                    nodeA.vx += impulseX;
+                    nodeA.vy += impulseY;
+                    nodeB.vx -= impulseX;
+                    nodeB.vy -= impulseY;
+                }
+            }
+            
+            // 通常の反発力
+            if (distance < minDistance) {
+                const force = (minDistance - distance) / distance * 1.2;
+                const fx = dx * force;
+                const fy = dy * force;
+                
+                nodeA.applyForce(-fx, -fy);
+                nodeB.applyForce(fx, fy);
+            }
+            
+            // 長距離反発力
+            const repulsion = 800 / (distance * distance);
+            const fx = (dx / distance) * repulsion;
+            const fy = (dy / distance) * repulsion;
+            
+            nodeA.applyForce(-fx, -fy);
+            nodeB.applyForce(fx, fy);
+        }
+    }
+    
+    // 2. エッジの引力
+    edges.forEach(edge => {
+        const dx = edge.to.x - edge.from.x;
+        const dy = edge.to.y - edge.from.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        const idealDistance = 600;
+        const force = (distance - idealDistance) * 0.0005;
+        const fx = (dx / distance) * force;
+        const fy = (dy / distance) * force;
+        
+        edge.from.applyForce(fx, fy);
+        edge.to.applyForce(-fx, -fy);
+    });
+    
+    // 3. 位置更新
+    nodes.forEach(n => n.update());
+    
+    drawGraph();
+    animationFrameId = requestAnimationFrame(updatePhysics);
+};
+
+console.log('✅ 衝突反発: ビリヤード風の跳ね返り追加');
+
+// 初期描画時に全ノードが見えるようにビューを調整
+function fitToView() {
+    if (nodes.length === 0) return;
+    
+    // 全ノードの範囲を計算
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    
+    nodes.forEach(node => {
+        const margin = node.radius + 50; // マージン
+        minX = Math.min(minX, node.x - margin);
+        maxX = Math.max(maxX, node.x + margin);
+        minY = Math.min(minY, node.y - margin);
+        maxY = Math.max(maxY, node.y + margin);
+    });
+    
+    const graphWidth = maxX - minX;
+    const graphHeight = maxY - minY;
+    const graphCenterX = (minX + maxX) / 2;
+    const graphCenterY = (minY + maxY) / 2;
+    
+    // キャンバスサイズ
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    
+    // スケール計算（余裕を持たせる）
+    const scaleX = canvasWidth / graphWidth * 0.8;
+    const scaleY = canvasHeight / graphHeight * 0.8;
+    scale = Math.min(scaleX, scaleY, 1); // 最大1倍
+    
+    // オフセット計算（中心に配置）
+    offsetX = canvasWidth / 2 - graphCenterX * scale;
+    offsetY = canvasHeight / 2 - graphCenterY * scale;
+    
+    drawGraph();
+    console.log(`📐 ビュー調整: scale=${scale.toFixed(2)}, offset=(${offsetX.toFixed(0)}, ${offsetY.toFixed(0)})`);
+}
+
+// buildGraph の最後に追加
+buildGraph = function(address, txs) {
+    nodes = [];
+    edges = [];
+    
+    const center = new Node(address, canvas.width / 2, canvas.height / 2);
+    center.color = '#00ffff';
+    center.radius = 30;
+    nodes.push(center);
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        const angle = (i / txs.length) * Math.PI * 2;
+        const node = new Node(addr, center.x + Math.cos(angle) * 800, center.y + Math.sin(angle) * 800);
+        nodes.push(node);
+        edges.push(new Edge(center, node));
+    });
+    
+    fitToView(); // ビュー調整
+    startPhysics();
+    detectExchanges();
+    fetchBalancesAndUpdateSizes();
+    console.log('マップ生成:', nodes.length, 'ノード');
+};
+
+// リセットビューボタンも更新
+document.getElementById('resetViewBtn')?.addEventListener('click', () => {
+    fitToView();
+});
+
+console.log('✅ 修正: 初期描画を画面内に収める');
+
+// サイズ計算を修正（変化をより大きく）
+Node.prototype.updateSizeFromBalance = function() {
+    if (this.totalBalanceUSD === 0) {
+        this.radius = this.baseRadius;
+        return;
+    }
+    
+    // 対数スケール（より大きな変化）
+    const logBalance = Math.log10(Math.max(10, this.totalBalanceUSD)); // $10から開始
+    const logMin = Math.log10(10);        // $10
+    const logBase = Math.log10(1000);     // $1,000（中間）
+    const logMax = Math.log10(100000);    // $100,000
+    
+    this.minRadius = 10;  // 15→10
+    this.maxRadius = 60;  // 50→60
+    
+    let normalized;
+    
+    if (this.totalBalanceUSD < 1000) {
+        // $10 〜 $1,000: 最小〜標準
+        normalized = (logBalance - logMin) / (logBase - logMin);
+        this.radius = this.minRadius + (this.baseRadius - this.minRadius) * normalized;
+    } else {
+        // $1,000 〜 $100,000: 標準〜最大
+        normalized = Math.min(1, (logBalance - logBase) / (logMax - logBase));
+        this.radius = this.baseRadius + (this.maxRadius - this.baseRadius) * normalized;
+    }
+    
+    console.log(`資産: $${this.totalBalanceUSD.toFixed(2)} → サイズ: ${this.radius.toFixed(1)}px`);
+};
+
+console.log('✅ 修正: サイズ範囲を拡大（10px〜60px）、閾値を$10/$1,000/$100,000に');
+
+// ツールチップ機能追加
+const tooltip = document.getElementById('tooltip');
+let currentTooltipNode = null;
+
+canvas?.addEventListener('mousemove', function(e) {
+    if (draggedNode || isDragging) {
+        // ドラッグ中は非表示
+        tooltip?.classList.remove('show');
+        return;
+    }
+    
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    let foundNode = null;
+    
+    for (const node of nodes) {
+        const x = node.x * scale + offsetX;
+        const y = node.y * scale + offsetY;
+        const r = node.radius * scale;
+        
+        if (Math.sqrt((mx - x) ** 2 + (my - y) ** 2) <= r) {
+            foundNode = node;
+            break;
+        }
+    }
+    
+    if (foundNode && foundNode !== currentTooltipNode) {
+        showTooltip(foundNode, e.clientX, e.clientY);
+        currentTooltipNode = foundNode;
+    } else if (!foundNode) {
+        tooltip?.classList.remove('show');
+        currentTooltipNode = null;
+    }
+});
+
+function showTooltip(node, x, y) {
+    if (!tooltip) return;
+    
+    const title = document.getElementById('tooltipTitle');
+    const content = document.getElementById('tooltipContent');
+    
+    // タイトル
+    if (node.isExchange) {
+        if (title) title.textContent = '取引所';
+    } else {
+        if (title) title.textContent = 'ウォレット';
+    }
+    
+    // 内容
+    if (content) {
+        let html = `<div style="font-family:monospace;font-size:11px;">${node.address.slice(0,10)}...${node.address.slice(-8)}</div>`;
+        
+        if (node.exchangeName) {
+            html += `<div style="color:#FF9500;margin-top:5px;font-weight:600;">${node.exchangeName}</div>`;
+        }
+        
+        // 資産表示
+        if (node.totalBalanceUSD > 0) {
+            html += `<div style="color:#00ff88;margin-top:8px;font-weight:600;">
+                総資産: $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
+            </div>`;
+            
+            // トップ3トークン
+            if (node.tokens.length > 0) {
+                html += `<div style="margin-top:6px;font-size:10px;color:#888;">`;
+                node.tokens.slice(0, 3).forEach(token => {
+                    html += `<div style="margin-top:3px;">
+                        <span style="color:#00ffff;">${token.symbol}</span>: 
+                        <span style="color:#aaa;">${token.balance.toFixed(4)}</span>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+        }
+        
+        content.innerHTML = html;
+    }
+    
+    tooltip.style.left = x + 15 + 'px';
+    tooltip.style.top = y + 15 + 'px';
+    tooltip.classList.add('show');
+}
+
+console.log('✅ Phase 6.1: ツールチップに資産表示追加');
+
+// ツールチップ位置を画面内に収める
+function showTooltip(node, x, y) {
+    if (!tooltip) return;
+    
+    const title = document.getElementById('tooltipTitle');
+    const content = document.getElementById('tooltipContent');
+    
+    // タイトル
+    if (node.isExchange) {
+        if (title) title.textContent = '取引所';
+    } else {
+        if (title) title.textContent = 'ウォレット';
+    }
+    
+    // 内容
+    if (content) {
+        let html = `<div style="font-family:monospace;font-size:11px;">${node.address.slice(0,10)}...${node.address.slice(-8)}</div>`;
+        
+        if (node.exchangeName) {
+            html += `<div style="color:#FF9500;margin-top:5px;font-weight:600;">${node.exchangeName}</div>`;
+        }
+        
+        if (node.totalBalanceUSD > 0) {
+            html += `<div style="color:#00ff88;margin-top:8px;font-weight:600;">
+                総資産: $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
+            </div>`;
+            
+            if (node.tokens.length > 0) {
+                html += `<div style="margin-top:6px;font-size:10px;color:#888;">`;
+                node.tokens.slice(0, 3).forEach(token => {
+                    html += `<div style="margin-top:3px;">
+                        <span style="color:#00ffff;">${token.symbol}</span>: 
+                        <span style="color:#aaa;">${token.balance.toFixed(4)}</span>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+        }
+        
+        content.innerHTML = html;
+    }
+    
+    // 一旦表示して実際のサイズを取得
+    tooltip.style.left = x + 15 + 'px';
+    tooltip.style.top = y + 15 + 'px';
+    tooltip.classList.add('show');
+    
+    // サイズ取得
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    // 横方向の調整
+    let finalX = x + 15;
+    if (finalX + tooltipRect.width > windowWidth - 10) {
+        finalX = x - tooltipRect.width - 15; // 左側に表示
+    }
+    
+    // 縦方向の調整
+    let finalY = y + 15;
+    if (finalY + tooltipRect.height > windowHeight - 10) {
+        finalY = y - tooltipRect.height - 15; // 上側に表示
+    }
+    
+    // 最終位置設定
+    tooltip.style.left = finalX + 'px';
+    tooltip.style.top = finalY + 'px';
+}
+
+console.log('✅ 修正: ツールチップを画面内に収める');

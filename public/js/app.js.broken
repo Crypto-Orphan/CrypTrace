@@ -1,0 +1,321 @@
+    if (!append) { nodes = []; edges = []; }
+let edges = [];
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+
+const CHAIN_CONFIGS = {
+    'ethereum': { name: 'Ethereum', symbol: 'ETH', chainId: '1', decimals: 18 },
+    'bsc': { name: 'BSC', symbol: 'BNB', chainId: '56', decimals: 18 },
+    'polygon': { name: 'Polygon', symbol: 'MATIC', chainId: '137', decimals: 18 },
+    'arbitrum': { name: 'Arbitrum', symbol: 'ETH', chainId: '42161', decimals: 18 },
+    'optimism': { name: 'Optimism', symbol: 'ETH', chainId: '10', decimals: 18 },
+    'avalanche': { name: 'Avalanche', symbol: 'AVAX', chainId: '43114', decimals: 18 },
+    'base': { name: 'Base', symbol: 'ETH', chainId: '8453', decimals: 18 }
+};
+
+const canvas = document.getElementById('mindmapCanvas');
+const ctx = canvas ? canvas.getContext('2d') : null;
+const tooltip = document.getElementById('tooltip');
+const infoPanel = document.getElementById('infoPanel');
+
+if (canvas) {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+}
+
+// チェーン選択
+const chainSelect = document.getElementById('chainSelect');
+if (chainSelect) {
+    Object.keys(CHAIN_CONFIGS).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = CHAIN_CONFIGS[key].name;
+        chainSelect.appendChild(opt);
+    });
+}
+
+console.log('CrypTrace initialized');
+
+// 探索ボタン
+document.getElementById('exploreBtn')?.addEventListener('click', async () => {
+    const address = document.getElementById('addressInput')?.value.trim();
+    const chain = chainSelect?.value;
+    
+    if (!address) return alert('アドレスを入力してください');
+    
+    try {
+        document.getElementById('loading')?.classList.add('show');
+        const result = await API.getTransactions(address, chain, 20, 'native', null);
+        
+        if (result.ok && result.data) {
+            buildGraph(address, result.data);
+        }
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        document.getElementById('loading')?.classList.remove('show');
+    }
+});
+
+// Node/Edge/Graph
+class Node {
+    constructor(address, x, y, isCenter = false) {
+        this.address = address;
+        this.x = x;
+        this.y = y;
+        this.radius = isCenter ? 30 : 20;
+        this.color = isCenter ? '#00ffff' : '#0088ff';
+        this.isCenter = isCenter;
+    }
+    
+    draw() {
+        const x = this.x * scale + offsetX;
+        const y = this.y * scale + offsetY;
+        const r = this.radius * scale;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Edge {
+    constructor(from, to) { this.from = from; this.to = to; }
+    draw() {
+        const x1 = this.from.x * scale + offsetX;
+        const y1 = this.from.y * scale + offsetY;
+        const x2 = this.to.x * scale + offsetX;
+        const y2 = this.to.y * scale + offsetY;
+        ctx.strokeStyle = 'rgba(0,136,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+    }
+}
+
+function buildGraph(address, txs, append = false) {
+    if (!append) { nodes = []; edges = []; }
+    edges = [];
+    const center = new Node(address, canvas.width/2, canvas.height/2, true);
+    nodes.push(center);
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        const angle = (i / txs.length) * Math.PI * 2;
+        const node = new Node(addr, center.x + Math.cos(angle)*200, center.y + Math.sin(angle)*200);
+        nodes.push(node);
+        edges.push(new Edge(center, node));
+    });
+    
+    drawGraph();
+}
+
+function drawGraph() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    edges.forEach(e => e.draw());
+    nodes.forEach(n => n.draw());
+}
+
+// ズーム/ドラッグ
+canvas?.addEventListener('wheel', e => { e.preventDefault(); scale *= e.deltaY > 0 ? 0.9 : 1.1; drawGraph(); });
+let isDragging = false, dx = 0, dy = 0;
+canvas?.addEventListener('mousedown', e => { isDragging = true; dx = e.clientX - offsetX; dy = e.clientY - offsetY; });
+canvas?.addEventListener('mousemove', e => { if(isDragging) { offsetX = e.clientX - dx; offsetY = e.clientY - dy; drawGraph(); }});
+canvas?.addEventListener('mouseup', () => isDragging = false);
+
+// ボタン
+document.getElementById('resetBtn')?.addEventListener('click', () => { nodes=[]; edges=[]; ctx.clearRect(0,0,canvas.width,canvas.height); });
+document.getElementById('resetViewBtn')?.addEventListener('click', () => { scale=1; offsetX=0; offsetY=0; drawGraph(); });
+document.getElementById('headerToggle')?.addEventListener('click', () => document.getElementById('header')?.classList.toggle('collapsed'));
+document.getElementById('legendToggle')?.addEventListener('click', () => { 
+    const c = document.getElementById('legendContent');
+    const t = document.getElementById('legendToggle');
+    c?.classList.toggle('collapsed');
+    if(t) t.textContent = c?.classList.contains('collapsed') ? '▶' : '▼';
+});
+
+console.log('✅ All features loaded');
+
+// ツールチップ
+canvas?.addEventListener('mousemove', (e) => {
+    if (isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    let found = null;
+    for (const node of nodes) {
+        const x = node.x * scale + offsetX;
+        const y = node.y * scale + offsetY;
+        const r = node.radius * scale;
+        if (Math.sqrt((mx-x)**2 + (my-y)**2) <= r) {
+            found = node;
+            break;
+        }
+    }
+    
+    if (found) {
+        tooltip.style.left = e.clientX + 15 + 'px';
+        tooltip.style.top = e.clientY + 15 + 'px';
+        const title = document.getElementById('tooltipTitle');
+        const content = document.getElementById('tooltipContent');
+        if (title) title.textContent = found.isCenter ? '🎯 中心' : '👤 ウォレット';
+        if (content) content.innerHTML = `<div style="font-family:monospace;font-size:11px;">${found.address.slice(0,10)}...${found.address.slice(-8)}</div>`;
+        tooltip.classList.add('show');
+    } else {
+        tooltip?.classList.remove('show');
+    }
+});
+
+// ノード発光
+Node.prototype.draw = function() {
+    const x = this.x * scale + offsetX;
+    const y = this.y * scale + offsetY;
+    const r = this.radius * scale;
+    
+    // グロー効果
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 15;
+    
+    // グラデーション
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, this.color);
+    grad.addColorStop(1, this.color + '44');
+    ctx.fillStyle = grad;
+    
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.shadowBlur = 0;
+};
+
+// クリックでパネル表示
+canvas?.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    for (const node of nodes) {
+        const x = node.x * scale + offsetX;
+        const y = node.y * scale + offsetY;
+        const r = node.radius * scale;
+        if (Math.sqrt((mx-x)**2 + (my-y)**2) <= r) {
+            showInfoPanel(node);
+            return;
+        }
+    }
+});
+
+// 情報パネル表示
+async function showInfoPanel(node) {
+    const content = document.getElementById('infoPanelContent');
+    if (!content) return;
+    
+    const chain = chainSelect?.value;
+    const chainConfig = CHAIN_CONFIGS[chain];
+    
+    content.innerHTML = `
+        <div style="color:#00ffff;font-size:20px;margin-bottom:15px;">
+            ${node.isCenter ? '🎯 中心アドレス' : '👤 ウォレット'}
+        </div>
+        <div style="margin-bottom:12px;">
+            <div style="color:#888;font-size:12px;">アドレス</div>
+            <div style="font-family:monospace;font-size:13px;word-break:break-all;background:rgba(0,255,255,0.1);padding:8px;border-radius:6px;">${node.address}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <div style="color:#888;font-size:12px;">チェーン</div>
+            <div style="color:#00ffff;font-weight:bold;">${chainConfig?.name}</div>
+        </div>
+        <div style="margin-bottom:15px;">
+            <div style="color:#888;font-size:12px;">保有トークン</div>
+            <div id="balanceLoading" style="color:#888;font-size:12px;">読み込み中...</div>
+        </div>
+        <button onclick="exploreFrom('${node.address}')" style="width:100%;padding:12px;background:linear-gradient(135deg,#00ffff,#0088ff);border:none;border-radius:8px;color:#000;font-weight:bold;cursor:pointer;">
+            📊 このアドレスから探索
+        </button>
+    `;
+    
+    infoPanel.classList.add('show');
+    
+    // 残高取得
+    try {
+        const result = await API.getBalances(node.address, chain);
+        const balDiv = document.getElementById('balanceLoading');
+        if (balDiv && result.ok && result.data) {
+            if (result.data.length === 0) {
+                balDiv.innerHTML = '<div style="color:#666;">トークン保有なし</div>';
+            } else {
+                balDiv.innerHTML = result.data.slice(0, 5).map(t => 
+                    `<div style="margin-bottom:6px;padding:6px;background:rgba(0,255,255,0.05);border-radius:4px;">
+                        <span style="color:#00ffff;font-weight:600;">${t.symbol}</span>
+                        <span style="color:#888;font-size:11px;margin-left:5px;">${t.name}</span>
+                    </div>`
+                ).join('');
+            }
+        }
+    } catch (e) {
+        console.error('残高取得エラー:', e);
+    }
+}
+
+// このアドレスから探索
+window.exploreFrom = async (address) => {
+    document.getElementById('addressInput').value = address;
+    infoPanel.classList.remove('show');
+    document.getElementById('exploreBtn')?.click();
+};
+
+document.getElementById('closeBtn')?.addEventListener('click', () => {
+    infoPanel?.classList.remove('show');
+});
+// 選択ノード
+let selectedNode = null;
+
+// クリック時に選択
+canvas?.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    for (const node of nodes) {
+        const x = node.x * scale + offsetX;
+        const y = node.y * scale + offsetY;
+        const r = node.radius * scale;
+        if (Math.sqrt((mx-x)**2 + (my-y)**2) <= r) {
+            selectedNode = node;
+            showInfoPanel(node);
+            drawGraph();
+            return;
+        }
+    }
+});
+
+// drawGraphを更新
+const originalDraw = drawGraph;
+drawGraph = function() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    edges.forEach(e => e.draw());
+    nodes.forEach(n => {
+        // 選択されたノードに枠を表示
+        if (n === selectedNode) {
+            const x = n.x * scale + offsetX;
+            const y = n.y * scale + offsetY;
+            const r = n.radius * scale;
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 4;
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 25;
+            ctx.beginPath();
+            ctx.arc(x, y, r + 10, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+        n.draw();
+    });
+};
