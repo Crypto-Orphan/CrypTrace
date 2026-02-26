@@ -2126,3 +2126,20 @@ function showTooltip(node, x, y) {
 }
 
 console.log('✅ 修正: ツールチップを画面内に収める');
+
+// 凡例ボタンのイベントリスナーを再定義
+const toggleLegendBtn = document.getElementById('toggleLegendBtn');
+if (toggleLegendBtn) {
+    toggleLegendBtn.addEventListener('click', () => {
+        const legendContent = document.getElementById('legendContent');
+        const legendHeader = document.querySelector('.legend-header');
+        
+        if (legendContent && legendHeader) {
+            legendContent.classList.toggle('collapsed');
+            legendHeader.classList.toggle('collapsed');
+            console.log('凡例トグル:', legendContent.classList.contains('collapsed') ? '閉じた' : '開いた');
+        }
+    });
+}
+
+console.log('✅ 凡例ボタン修正完了');

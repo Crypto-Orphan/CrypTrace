@@ -21,3 +21,10 @@ const API = {
     return res.json();
   }
 };
+
+// ネイティブ残高取得
+API.getNativeBalance = async function(address, chain) {
+    const params = new URLSearchParams({ address, chain });
+    const response = await fetch(`/api/native-balance?${params}`);
+    return await response.json();
+};
