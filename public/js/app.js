@@ -2143,3 +2143,105 @@ if (toggleLegendBtn) {
 }
 
 console.log('✅ 凡例ボタン修正完了');
+
+// 資産額で色変更
+Node.prototype.updateColorFromBalance = function() {
+    if (this.isExchange) return;
+    
+    if (this.totalBalanceUSD < 1000) {
+        this.color = '#0088ff';
+    } else if (this.totalBalanceUSD < 100000) {
+        this.color = '#9933ff';
+    } else {
+        this.color = '#ff3366';
+    }
+};
+
+const _setBalance = Node.prototype.setBalance;
+Node.prototype.setBalance = function(tokens, totalUSD) {
+    this.tokens = tokens;
+    this.totalBalanceUSD = totalUSD;
+    this.updateSizeFromBalance();
+    this.updateColorFromBalance();
+};
+
+console.log('✅ 着色');
+
+// プログレスバー表示
+function showBalanceLoadingStatus(current, total) {
+    const container = document.getElementById('progressContainer');
+    const bar = document.getElementById('progressBar');
+    const text = document.getElementById('progressText');
+    
+    if (container) container.style.display = 'block';
+    const percent = Math.round((current / total) * 100);
+    if (bar) bar.style.width = percent + '%';
+    if (text) text.textContent = `資産取得中... ${current}/${total} (${percent}%)`;
+}
+
+function hideBalanceLoadingStatus() {
+    const container = document.getElementById('progressContainer');
+    if (container) setTimeout(() => container.style.display = 'none', 1000);
+}
+
+// 資産取得を高速化 + プログレスバー対応
+fetchBalancesAndUpdateSizes = async function() {
+    console.log('💰 資産取得開始:', nodes.length, 'ノード');
+    const batchSize = 10;
+    let completed = 0;
+    showBalanceLoadingStatus(0, nodes.length);
+    
+    for (let i = 0; i < nodes.length; i += batchSize) {
+        const batch = nodes.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (node) => {
+            try {
+                const chain = chainSelect?.value || 'ethereum';
+                let totalUSD = 0;
+                const tokens = [];
+                
+                try {
+                    const nativeResult = await API.getNativeBalance(node.address, chain);
+                    if (nativeResult.ok && nativeResult.data.balance !== '0') {
+                        const balance = parseFloat(nativeResult.data.balance) / Math.pow(10, nativeResult.data.decimals);
+                        const symbol = nativeResult.data.symbol;
+                        let priceUSD = 0;
+                        if (['ETH', 'WETH'].includes(symbol)) priceUSD = 2500;
+                        else if (symbol === 'BNB') priceUSD = 300;
+                        else if (symbol === 'MATIC') priceUSD = 0.8;
+                        else if (symbol === 'AVAX') priceUSD = 35;
+                        const valueUSD = balance * priceUSD;
+                        totalUSD += valueUSD;
+                        tokens.push({ symbol, balance, priceUSD, valueUSD });
+                    }
+                } catch (e) {}
+                
+                const result = await API.getBalances(node.address, chain);
+                if (result.ok && result.data && result.data.length > 0) {
+                    for (const token of result.data.slice(0, 5)) {
+                        const symbol = token.symbol || 'Unknown';
+                        const balanceRaw = token.balance || '0';
+                        const decimals = parseInt(token.decimals || 18);
+                        const balance = parseFloat(balanceRaw) / Math.pow(10, decimals);
+                        const normalizedSymbol = symbol.normalize('NFKC').replace(/[^\x00-\x7F]/g, '');
+                        let priceUSD = 0;
+                        if (['USDT', 'USDC', 'DAI', 'BUSD', 'USDI'].some(s => normalizedSymbol.includes(s))) priceUSD = 1;
+                        else if (['WETH', 'ETH'].includes(normalizedSymbol)) priceUSD = 2500;
+                        else if (['WBTC', 'BTC'].includes(normalizedSymbol)) priceUSD = 50000;
+                        const valueUSD = balance * priceUSD;
+                        totalUSD += valueUSD;
+                        if (valueUSD > 0) tokens.push({ symbol, balance, priceUSD, valueUSD });
+                    }
+                }
+                if (totalUSD > 0) node.setBalance(tokens, totalUSD);
+                completed++;
+                showBalanceLoadingStatus(completed, nodes.length);
+            } catch (e) { completed++; }
+        }));
+        drawGraph();
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    hideBalanceLoadingStatus();
+    console.log('✅ 資産取得完了');
+};
+
+console.log('✅ プログレスバー');

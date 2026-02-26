@@ -18,6 +18,13 @@
             <div id="statusIndicator" class="status-indicator ready">
                 準備完了 - APIキー設定済み
             </div>
+            <!-- プログレスバー -->
+            <div id="progressContainer" style="display:none;margin-top:10px;">
+                <div style="background:rgba(0,255,255,0.1);border-radius:10px;overflow:hidden;height:8px;position:relative;">
+                    <div id="progressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#00ffff,#0088ff);box-shadow:0 0 20px rgba(0,255,255,0.8);transition:width 0.3s ease;"></div>
+                </div>
+                <div id="progressText" style="color:#00ffff;font-size:11px;margin-top:5px;text-align:center;">資産取得中...</div>
+            </div>
             <div class="input-section">
                 <div class="input-group">
                     <label for="chainSelect">チェーン</label>
