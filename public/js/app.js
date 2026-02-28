@@ -2245,3 +2245,20 @@ fetchBalancesAndUpdateSizes = async function() {
 };
 
 console.log('✅ プログレスバー');
+
+// ヘッダー折りたたみ
+document.getElementById('toggleHeaderBtn')?.addEventListener('click', () => {
+    const header = document.querySelector('.header');
+    const btn = document.getElementById('toggleHeaderBtn');
+    
+    if (header) {
+        header.classList.toggle('collapsed');
+        if (header.classList.contains('collapsed')) {
+            btn.textContent = '▼ 表示';
+        } else {
+            btn.textContent = '▲ 隠す';
+        }
+    }
+});
+
+console.log('✅ ヘッダー折りたたみ');

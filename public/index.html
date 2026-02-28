@@ -13,8 +13,10 @@
     
     <div class="container">
         <div class="header" id="header">
-            <button class="header-toggle" id="headerToggle"></button>
             <h1>🔗 CrypTrace - Blockchain Explorer</h1>
+                <button id="toggleHeaderBtn" style="position:absolute;top:10px;right:10px;background:rgba(0,255,255,0.2);border:1px solid #00ffff;color:#00ffff;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;">
+                    ▲ 隠す
+                </button>
             <div id="statusIndicator" class="status-indicator ready">
                 準備完了 - APIキー設定済み
             </div>
@@ -82,7 +84,9 @@
             <div class="legend" id="legend">
                 <div class="legend-header" id="legendHeader">
                     <div class="legend-title">凡例</div>
-                    <button class="legend-toggle" id="legendToggle">▼</button>
+                    <button id="toggleLegendBtn" style="background:rgba(0,255,255,0.2);border:1px solid #00ffff;color:#00ffff;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px;">
+                        ▼
+                    </button>
                 </div>
                 <div class="legend-content" id="legendContent">
                     <div class="legend-item">
