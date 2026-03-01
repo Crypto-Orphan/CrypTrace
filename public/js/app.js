@@ -2336,7 +2336,7 @@ Node.prototype.draw = function() {
         this.pulseTime += 0.05;
         const pulse = Math.sin(this.pulseTime) * 8;
         
-        for (let i = 5; i >= 1; i--) {
+        for (let i = 3; i >= 1; i--) {
             ctx.shadowColor = '#00ffff';
             ctx.shadowBlur = 50 * i;
             ctx.strokeStyle = `rgba(0, 255, 255, ${0.4 / i})`;
@@ -2370,9 +2370,9 @@ Node.prototype.draw = function() {
         
         // メインリング（淡いピンク）
         ctx.shadowColor = '#ff3366';
-        ctx.shadowBlur = 200; // 超強力グロー
+        ctx.shadowBlur = 250; // 超強力グロー
         ctx.strokeStyle = 'rgba(255, 51, 102, 0.3)'; // 淡いピンク
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 8;
         ctx.beginPath();
         ctx.arc(x, y, r + 20, 0, Math.PI * 2);
         ctx.stroke();
@@ -2427,3 +2427,63 @@ Node.prototype.draw = function() {
 };
 
 console.log('✅ 検索元マーカー改良（淡いピンク + 超強力グロー）');
+
+// buildGraphAppendを改良（検索元ノードを外側に移動）
+buildGraphAppend = function(address, txs, sourceNode) {
+    let centerNode = findNode(address);
+    
+    if (!centerNode) {
+        // 新しいノードの場合、sourceNodeから離れた位置に配置
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 800;
+        centerNode = new Node(
+            address,
+            sourceNode.x + Math.cos(angle) * distance,
+            sourceNode.y + Math.sin(angle) * distance
+        );
+        nodes.push(centerNode);
+    } else {
+        // 既存のノードの場合、sourceNodeから大きく移動
+        const dx = centerNode.x - sourceNode.x;
+        const dy = centerNode.y - sourceNode.y;
+        const currentDistance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (currentDistance < 500) {
+            // 近すぎる場合、1000px離す
+            const angle = Math.atan2(dy, dx);
+            centerNode.x = sourceNode.x + Math.cos(angle) * 1000;
+            centerNode.y = sourceNode.y + Math.sin(angle) * 1000;
+            
+            // 速度リセット
+            centerNode.vx = 0;
+            centerNode.vy = 0;
+        }
+    }
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        let node = findNode(addr);
+        
+        if (!node) {
+            const angle = (i / txs.length) * Math.PI * 2;
+            const distance = 800;
+            node = new Node(
+                addr,
+                centerNode.x + Math.cos(angle) * distance,
+                centerNode.y + Math.sin(angle) * distance
+            );
+            nodes.push(node);
+        }
+        
+        if (!edgeExists(centerNode, node)) {
+            edges.push(new Edge(centerNode, node));
+        }
+    });
+    
+    detectExchanges();
+    fetchBalancesAndUpdateSizes();
+    
+    if (centerNode) centerNode.markAsSearchOrigin();
+};
+
+console.log('✅ 検索元ノードを自動移動（重なり防止）');
