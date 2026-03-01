@@ -2487,3 +2487,195 @@ buildGraphAppend = function(address, txs, sourceNode) {
 };
 
 console.log('✅ 検索元ノードを自動移動（重なり防止）');
+
+// Edgeクラスを拡張（送金額・チェーン情報追加）
+Edge.prototype.value = '0';
+Edge.prototype.chain = 'ethereum';
+
+// buildGraph/buildGraphAppendでエッジ作成時に送金額を渡す
+buildGraph = function(address, txs) {
+    nodes = [];
+    edges = [];
+    
+    const center = new Node(address, canvas.width / 2, canvas.height / 2);
+    center.color = '#00ffff';
+    center.radius = 30;
+    nodes.push(center);
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        const angle = (i / txs.length) * Math.PI * 2;
+        const node = new Node(addr, center.x + Math.cos(angle) * 800, center.y + Math.sin(angle) * 800);
+        nodes.push(node);
+        
+        const edge = new Edge(center, node);
+        edge.value = tx.value || '0';
+        edge.chain = chainSelect?.value || 'ethereum';
+        edges.push(edge);
+    });
+    
+    fitToView();
+    startPhysics();
+    detectExchanges();
+    fetchBalancesAndUpdateSizes();
+    
+    const centerNode = findNode(address);
+    if (centerNode) centerNode.markAsSearchOrigin();
+    
+    console.log('Map created:', nodes.length, 'nodes');
+};
+
+buildGraphAppend = function(address, txs, sourceNode) {
+    let centerNode = findNode(address);
+    
+    if (!centerNode) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 800;
+        centerNode = new Node(
+            address,
+            sourceNode.x + Math.cos(angle) * distance,
+            sourceNode.y + Math.sin(angle) * distance
+        );
+        nodes.push(centerNode);
+    } else {
+        const dx = centerNode.x - sourceNode.x;
+        const dy = centerNode.y - sourceNode.y;
+        const currentDistance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (currentDistance < 500) {
+            const angle = Math.atan2(dy, dx);
+            centerNode.x = sourceNode.x + Math.cos(angle) * 1000;
+            centerNode.y = sourceNode.y + Math.sin(angle) * 1000;
+            centerNode.vx = 0;
+            centerNode.vy = 0;
+        }
+    }
+    
+    txs.forEach((tx, i) => {
+        const addr = (tx.from.toLowerCase() === address.toLowerCase()) ? tx.to : tx.from;
+        let node = findNode(addr);
+        
+        if (!node) {
+            const angle = (i / txs.length) * Math.PI * 2;
+            const distance = 800;
+            node = new Node(
+                addr,
+                centerNode.x + Math.cos(angle) * distance,
+                centerNode.y + Math.sin(angle) * distance
+            );
+            nodes.push(node);
+        }
+        
+        if (!edgeExists(centerNode, node)) {
+            const edge = new Edge(centerNode, node);
+            edge.value = tx.value || '0';
+            edge.chain = chainSelect?.value || 'ethereum';
+            edges.push(edge);
+        }
+    });
+    
+    detectExchanges();
+    fetchBalancesAndUpdateSizes();
+    
+    if (centerNode) centerNode.markAsSearchOrigin();
+};
+
+console.log('✅ Edge data: value & chain added');
+
+// ノードツールチップに送金額を統合表示
+function showTooltip(node, x, y) {
+    if (!tooltip) return;
+    
+    const title = document.getElementById('tooltipTitle');
+    const content = document.getElementById('tooltipContent');
+    
+    if (node.isExchange) {
+        if (title) title.textContent = 'Exchange';
+    } else {
+        if (title) title.textContent = 'Wallet';
+    }
+    
+    if (content) {
+        let html = `<div style="font-family:monospace;font-size:11px;">${node.address.slice(0,10)}...${node.address.slice(-8)}</div>`;
+        
+        if (node.exchangeName) {
+            html += `<div style="color:#FF9500;margin-top:5px;font-weight:600;">${node.exchangeName}</div>`;
+        }
+        
+        // 接続エッジの送金額
+        const connectedEdges = edges.filter(e => e.from === node || e.to === node);
+        if (connectedEdges.length > 0) {
+            html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">`;
+            html += `<div style="color:#888;font-size:10px;margin-bottom:4px;">Transactions (${connectedEdges.length})</div>`;
+            
+            connectedEdges.slice(0, 5).forEach(edge => {
+                const chainConfig = CHAIN_CONFIGS[edge.chain] || CHAIN_CONFIGS.ethereum;
+                const decimals = chainConfig.decimals || 18;
+                
+                let value = 0;
+                try {
+                    value = parseFloat(edge.value) / Math.pow(10, decimals);
+                } catch (e) {
+                    value = 0;
+                }
+                if (isNaN(value)) value = 0;
+                
+                const isIncoming = edge.to === node;
+                const arrow = isIncoming ? '← ' : '→ ';
+                const color = isIncoming ? '#00ff88' : '#ff8800';
+                
+                html += `<div style="font-size:10px;margin-top:3px;color:${color};">
+                    ${arrow}${value.toFixed(4)} ${chainConfig.symbol}
+                </div>`;
+            });
+            
+            if (connectedEdges.length > 5) {
+                html += `<div style="font-size:9px;color:#666;margin-top:3px;">+${connectedEdges.length - 5} more...</div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        if (node.totalBalanceUSD > 0) {
+            html += `<div style="color:#00ff88;margin-top:8px;font-weight:600;">
+                Total: $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
+            </div>`;
+            
+            if (node.tokens.length > 0) {
+                html += `<div style="margin-top:6px;font-size:10px;color:#888;">`;
+                node.tokens.slice(0, 3).forEach(token => {
+                    html += `<div style="margin-top:3px;">
+                        <span style="color:#00ffff;">${token.symbol}</span>: 
+                        <span style="color:#aaa;">${token.balance.toFixed(4)}</span>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+        }
+        
+        content.innerHTML = html;
+    }
+    
+    tooltip.style.left = x + 15 + 'px';
+    tooltip.style.top = y + 15 + 'px';
+    tooltip.classList.add('show');
+    
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    let finalX = x + 15;
+    if (finalX + tooltipRect.width > windowWidth - 10) {
+        finalX = x - tooltipRect.width - 15;
+    }
+    
+    let finalY = y + 15;
+    if (finalY + tooltipRect.height > windowHeight - 10) {
+        finalY = y - tooltipRect.height - 15;
+    }
+    
+    tooltip.style.left = finalX + 'px';
+    tooltip.style.top = finalY + 'px';
+}
+
+console.log('✅ Node tooltip: transaction amounts integrated');
