@@ -2246,22 +2246,7 @@ fetchBalancesAndUpdateSizes = async function() {
 
 console.log('✅ プログレスバー');
 
-// ヘッダー折りたたみ
-document.getElementById('toggleHeaderBtn')?.addEventListener('click', () => {
-    const header = document.querySelector('.header');
-    const btn = document.getElementById('toggleHeaderBtn');
-    
-    if (header) {
-        header.classList.toggle('collapsed');
-        if (header.classList.contains('collapsed')) {
-            btn.textContent = '▼ Show';
-        } else {
-            btn.textContent = '▲ Hide';
-        }
-    }
-});
 
-console.log('✅ ヘッダー折りたたみ');
 
 // 検索元ノードにマーカー追加
 Node.prototype.isSearchOrigin = false;
@@ -2679,3 +2664,73 @@ function showTooltip(node, x, y) {
 }
 
 console.log('✅ Node tooltip: transaction amounts integrated');
+
+// キャンバスリサイズ時に画角を維持
+let savedViewState = {
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0
+};
+
+function saveViewState() {
+    savedViewState.scale = scale;
+    savedViewState.offsetX = offsetX;
+    savedViewState.offsetY = offsetY;
+}
+
+function restoreViewState() {
+    scale = savedViewState.scale;
+    offsetX = savedViewState.offsetX;
+    offsetY = savedViewState.offsetY;
+}
+
+// リサイズイベント
+window.addEventListener('resize', () => {
+    if (!canvas) return;
+    
+    saveViewState();
+    
+    const oldWidth = canvas.width;
+    const oldHeight = canvas.height;
+    
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    const widthRatio = canvas.width / oldWidth;
+    const heightRatio = canvas.height / oldHeight;
+    
+    // オフセットを調整（中心を維持）
+    offsetX = offsetX * widthRatio;
+    offsetY = offsetY * heightRatio;
+    
+    drawGraph();
+});
+
+// ヘッダー折りたたみボタンを更新
+document.getElementById('toggleHeaderBtn')?.addEventListener('click', () => {
+    const header = document.querySelector('.header');
+    const btn = document.getElementById('toggleHeaderBtn');
+    
+    if (header) {
+        saveViewState();
+        
+        header.classList.toggle('collapsed');
+        if (header.classList.contains('collapsed')) {
+            btn.textContent = '▼ Show';
+        } else {
+            btn.textContent = '▲ Hide';
+        }
+        
+        // DOM更新後にcanvasサイズ調整
+        setTimeout(() => {
+            if (canvas) {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                restoreViewState();
+                drawGraph();
+            }
+        }, 300); // アニメーション完了後
+    }
+});
+
+console.log('✅ View state preservation on resize/collapse');
