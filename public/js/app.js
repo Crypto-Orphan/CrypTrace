@@ -2262,3 +2262,168 @@ document.getElementById('toggleHeaderBtn')?.addEventListener('click', () => {
 });
 
 console.log('✅ ヘッダー折りたたみ');
+
+// 検索元ノードにマーカー追加
+Node.prototype.isSearchOrigin = false;
+
+// 検索元としてマーク
+Node.prototype.markAsSearchOrigin = function() {
+    this.isSearchOrigin = true;
+};
+
+// Node描画を拡張（検索元マーカー追加）
+const _originalNodeDraw = Node.prototype.draw;
+Node.prototype.draw = function() {
+    _originalNodeDraw.call(this);
+    
+    // 検索元マーカー（赤い輪っか）
+    if (this.isSearchOrigin) {
+        const x = this.x * scale + offsetX;
+        const y = this.y * scale + offsetY;
+        const r = this.radius * scale;
+        
+        ctx.save();
+        
+        // メイン赤リング
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 200;
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 20;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 18, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+};
+
+// buildGraphで最初のノードをマーク
+const _originalBuildGraph = buildGraph;
+buildGraph = function(address, txs) {
+    _originalBuildGraph(address, txs);
+    
+    // 中心ノードを検索元としてマーク
+    const centerNode = findNode(address);
+    if (centerNode) {
+        centerNode.markAsSearchOrigin();
+    }
+};
+
+// buildGraphAppendでも検索元をマーク
+const _originalBuildGraphAppend = buildGraphAppend;
+buildGraphAppend = function(address, txs, sourceNode) {
+    _originalBuildGraphAppend(address, txs, sourceNode);
+    
+    // 新しい検索元をマーク
+    const centerNode = findNode(address);
+    if (centerNode) {
+        centerNode.markAsSearchOrigin();
+    }
+};
+
+console.log('✅ 検索元ノードに赤い輪っか追加');
+
+// 検索元マーカーを改良（淡い赤 + 強いグロー）
+Node.prototype.draw = function() {
+    const x = this.x * scale + offsetX;
+    const y = this.y * scale + offsetY;
+    const r = this.radius * scale;
+    
+    ctx.save();
+    
+    // 選択状態
+    if (this === selectedNode) {
+        this.pulseTime += 0.05;
+        const pulse = Math.sin(this.pulseTime) * 8;
+        
+        for (let i = 5; i >= 1; i--) {
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 50 * i;
+            ctx.strokeStyle = `rgba(0, 255, 255, ${0.4 / i})`;
+            ctx.lineWidth = 8;
+            
+            if (this.isExchange) {
+                this.drawHexagon(ctx, x, y, r + 20 * i);
+            } else {
+                ctx.beginPath();
+                ctx.arc(x, y, r + 20 * i, 0, Math.PI * 2);
+            }
+            ctx.stroke();
+        }
+        
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 60;
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 5;
+        
+        if (this.isExchange) {
+            this.drawHexagon(ctx, x, y, r + 15 + pulse);
+        } else {
+            ctx.beginPath();
+            ctx.arc(x, y, r + 15 + pulse, 0, Math.PI * 2);
+        }
+        ctx.stroke();
+    }
+    
+    // 検索元マーカー（淡い赤 + 強力グロー）
+    if (this.isSearchOrigin) {
+        
+        // メインリング（淡いピンク）
+        ctx.shadowColor = '#ff3366';
+        ctx.shadowBlur = 200; // 超強力グロー
+        ctx.strokeStyle = 'rgba(255, 51, 102, 0.3)'; // 淡いピンク
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 20, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    // 通常グロー
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 35;
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 4;
+    
+    if (this.isExchange) {
+        this.drawHexagon(ctx, x, y, r + 10);
+    } else {
+        ctx.beginPath();
+        ctx.arc(x, y, r + 10, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    
+    ctx.shadowBlur = 30;
+    ctx.globalAlpha = 1;
+    
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, this.color);
+    grad.addColorStop(0.3, this.color);
+    grad.addColorStop(1, this.color + '22');
+    ctx.fillStyle = grad;
+    
+    if (this.isExchange) {
+        this.drawHexagon(ctx, x, y, r);
+    } else {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    
+    ctx.shadowBlur = 20;
+    const lighterColor = this.getLighterColor();
+    ctx.strokeStyle = lighterColor;
+    ctx.lineWidth = 3;
+    
+    if (this.isExchange) {
+        this.drawHexagon(ctx, x, y, r);
+    } else {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    
+    ctx.restore();
+};
+
+console.log('✅ 検索元マーカー改良（淡いピンク + 超強力グロー）');
