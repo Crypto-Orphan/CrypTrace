@@ -122,7 +122,7 @@ document.getElementById('exploreBtn')?.addEventListener('click', async () => {
     const limit = document.getElementById('limitSelect')?.value || 20;
     
     if (!address) {
-        alert('アドレスを入力してください');
+        alert('Enter Address');
         return;
     }
     
@@ -229,20 +229,20 @@ function showInfoPanel(node) {
     
     content.innerHTML = `
         <div style="color:#00ffff;font-size:20px;margin-bottom:15px;">
-            ウォレット
+            Wallet
         </div>
         <div style="margin-bottom:12px;">
-            <div style="color:#888;font-size:12px;">アドレス</div>
+            <div style="color:#888;font-size:12px;">Address</div>
             <div style="font-family:monospace;font-size:13px;word-break:break-all;background:rgba(0,255,255,0.1);padding:8px;border-radius:6px;">
                 ${node.address}
             </div>
         </div>
         <div style="margin-bottom:12px;">
-            <div style="color:#888;font-size:12px;">チェーン</div>
+            <div style="color:#888;font-size:12px;">Chain</div>
             <div style="color:#00ffff;font-weight:bold;">${chainConfig?.name}</div>
         </div>
         <button id="exploreFromNode" style="width:100%;padding:12px;background:linear-gradient(135deg,#00ffff,#0088ff);border:none;border-radius:8px;color:#000;font-weight:bold;cursor:pointer;margin-top:15px;">
-            このアドレスから探索
+            Trace
         </button>
     `;
     
@@ -2014,9 +2014,9 @@ function showTooltip(node, x, y) {
     
     // タイトル
     if (node.isExchange) {
-        if (title) title.textContent = '取引所';
+        if (title) title.textContent = 'CEX/DEX';
     } else {
-        if (title) title.textContent = 'ウォレット';
+        if (title) title.textContent = 'Wallet';
     }
     
     // 内容
@@ -2030,7 +2030,7 @@ function showTooltip(node, x, y) {
         // 資産表示
         if (node.totalBalanceUSD > 0) {
             html += `<div style="color:#00ff88;margin-top:8px;font-weight:600;">
-                総資産: $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
+                Total : $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
             </div>`;
             
             // トップ3トークン
@@ -2065,9 +2065,9 @@ function showTooltip(node, x, y) {
     
     // タイトル
     if (node.isExchange) {
-        if (title) title.textContent = '取引所';
+        if (title) title.textContent = 'CEX/DEX';
     } else {
-        if (title) title.textContent = 'ウォレット';
+        if (title) title.textContent = 'Wallet';
     }
     
     // 内容
@@ -2080,7 +2080,7 @@ function showTooltip(node, x, y) {
         
         if (node.totalBalanceUSD > 0) {
             html += `<div style="color:#00ff88;margin-top:8px;font-weight:600;">
-                総資産: $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
+                Total : $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
             </div>`;
             
             if (node.tokens.length > 0) {
@@ -2176,7 +2176,7 @@ function showBalanceLoadingStatus(current, total) {
     if (container) container.style.display = 'block';
     const percent = Math.round((current / total) * 100);
     if (bar) bar.style.width = percent + '%';
-    if (text) text.textContent = `資産取得中... ${current}/${total} (${percent}%)`;
+    if (text) text.textContent = `Loading... ${current}/${total} (${percent}%)`;
 }
 
 function hideBalanceLoadingStatus() {
@@ -2254,9 +2254,9 @@ document.getElementById('toggleHeaderBtn')?.addEventListener('click', () => {
     if (header) {
         header.classList.toggle('collapsed');
         if (header.classList.contains('collapsed')) {
-            btn.textContent = '▼ 表示';
+            btn.textContent = '▼ Show';
         } else {
-            btn.textContent = '▲ 隠す';
+            btn.textContent = '▲ Hide';
         }
     }
 });

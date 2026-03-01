@@ -15,10 +15,10 @@
         <div class="header" id="header">
             <h1>🔗 CrypTrace - Blockchain Explorer</h1>
                 <button id="toggleHeaderBtn" style="position:absolute;top:10px;right:10px;background:rgba(0,255,255,0.2);border:1px solid #00ffff;color:#00ffff;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;">
-                    ▲ 隠す
+                    ▲ Hide
                 </button>
             <div id="statusIndicator" class="status-indicator ready">
-                準備完了 - APIキー設定済み
+                Address visualization in a mind-map format
             </div>
             <!-- プログレスバー -->
             <div id="progressContainer" style="display:none;margin-top:10px;">
@@ -29,15 +29,15 @@
             </div>
             <div class="input-section">
                 <div class="input-group">
-                    <label for="chainSelect">チェーン</label>
+                    <label for="chainSelect">Chain</label>
                     <select id="chainSelect"></select>
                 </div>
                 <div class="input-group">
-                    <label for="addressInput">アドレス</label>
+                    <label for="addressInput">Address</label>
                     <input type="text" id="addressInput" placeholder="0x..." />
                 </div>
                 <div class="input-group">
-                    <label for="limitSelect">取引数</label>
+                    <label for="limitSelect">Tx limit</label>
                     <select id="limitSelect">
                         <option value="10">10</option>
                         <option value="20" selected>20</option>
@@ -46,9 +46,9 @@
                     </select>
                 </div>
                 <div class="input-group">
-                    <label for="tokenTypeSelect">トークンタイプ</label>
+                    <label for="tokenTypeSelect">Token Type</label>
                     <select id="tokenTypeSelect">
-                        <option value="native">ネイティブ通貨</option>
+                        <option value="native">Native Token</option>
                         <option value="erc20">ERC-20</option>
                         <option value="erc721">ERC-721 (NFT)</option>
                     </select>
@@ -67,23 +67,23 @@
                         border: 1px solid rgba(0, 255, 136, 0.3);
                     "></div>
                 </div>
-                <button id="exploreBtn">探索開始</button>
+                <button id="exploreBtn">trace</button>
                 <button id="resetBtn" style="
                     background: linear-gradient(135deg, #ff00ff, #ff0088);
                     box-shadow: 0 4px 15px rgba(255, 0, 255, 0.3);
                 " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(255, 0, 255, 0.5)'" 
-                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(255, 0, 255, 0.3)'">リセット</button>
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(255, 0, 255, 0.3)'">Reset</button>
             </div>
         </div>
 
         <div class="canvas-container">
             <canvas id="mindmapCanvas"></canvas>
-            <button class="reset-button" id="resetViewBtn">🎯 ビューをリセット</button>
+            <button class="reset-button" id="resetViewBtn">origin</button>
             
             <!-- 凡例 -->
             <div class="legend" id="legend">
                 <div class="legend-header" id="legendHeader">
-                    <div class="legend-title">凡例</div>
+                    <div class="legend-title">Tips</div>
                     <button id="toggleLegendBtn" style="background:rgba(0,255,255,0.2);border:1px solid #00ffff;color:#00ffff;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px;">
                         ▼
                     </button>
@@ -93,31 +93,31 @@
                         <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
                             <div style="width:20px;height:20px;border-radius:50%;background:#00ffff;"></div>
                         </div>
-                        <div class="legend-label">中心アドレス</div>
+                        <div class="legend-label">Target Address</div>
                     </div>
                     <div class="legend-item">
                         <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
                             <div style="width:10px;height:10px;border-radius:50%;background:#0088ff;"></div>
                         </div>
-                        <div class="legend-label">小額 ($0-1K)</div>
+                        <div class="legend-label">Small ($0-1K)</div>
                     </div>
                     <div class="legend-item">
                         <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
                             <div style="width:20px;height:20px;border-radius:50%;background:#9933ff;"></div>
                         </div>
-                        <div class="legend-label">中額 ($1K-100K)</div>
+                        <div class="legend-label">Middle ($1K-100K)</div>
                     </div>
                     <div class="legend-item">
                         <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
                             <div style="width:30px;height:30px;border-radius:50%;background:#ff3366;"></div>
                         </div>
-                        <div class="legend-label">大口 ($100K+)</div>
+                        <div class="legend-label">Large ($100K+)</div>
                     </div>
                     <div class="legend-item">
                         <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;padding-left:10px;">
                             <div class="legend-icon hexagon" style="background:#FF9500;"></div>
                         </div>
-                        <div class="legend-label">取引所</div>
+                        <div class="legend-label">CEX/DEX</div>
                     </div>
                 </div>
             </div>
@@ -129,7 +129,7 @@
             
             <div class="info-panel" id="infoPanel">
                 <div class="info-panel-header">
-                    <div class="info-panel-title">詳細情報</div>
+                    <div class="info-panel-title">Details</div>
                     <button class="close-btn" id="closeBtn">×</button>
                 </div>
                 <div id="infoPanelContent"></div>
@@ -139,7 +139,7 @@
 
     <div class="loading" id="loading">
         <div class="spinner"></div>
-        <div class="loading-text">データ取得中...</div>
+        <div class="loading-text">Loading data...</div>
     </div>
 
     <div class="error-dialog" id="errorDialog">
@@ -185,7 +185,7 @@
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                     background-clip: text;
-                ">トークンを選択</div>
+                ">Select Token</div>
                 <button id="closeTokenModal" style="
                     background: rgba(255, 0, 100, 0.8);
                     border: none;
@@ -208,11 +208,11 @@
                     color: #e0e0e0;
                     margin-bottom: 10px;
                 ">
-                    <option value="symbol">ティッカー/シンボルで検索</option>
-                    <option value="address">トークンアドレスで検索</option>
+                    <option value="symbol">Search by ticker / symbol</option>
+                    <option value="address">Search by token address</option>
                 </select>
                 
-                <input type="text" id="customTokenSearch" placeholder="ティッカーを入力 (例: USDT, DAI)" 
+                <input type="text" id="customTokenSearch" placeholder="Enter ticker (e.g. USDT, USDC)" 
                     onkeydown="if(event.key==='Enter') runTokenSearch();"
                     style="
                     width: 100%;
@@ -235,7 +235,7 @@
                     font-weight: bold;
                     cursor: pointer;
                     font-size: 16px;
-                ">検索</button>
+                ">research</button>
                 
                 <div id="tokenInfoDisplay" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; border: 1px solid rgba(0, 255, 136, 0.3);"></div>
             </div>
