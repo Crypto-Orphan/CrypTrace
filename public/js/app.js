@@ -2734,3 +2734,114 @@ document.getElementById('toggleHeaderBtn')?.addEventListener('click', () => {
 });
 
 console.log('✅ View state preservation on resize/collapse');
+
+// 情報パネルにExplorerボタンを追加
+function showInfoPanel(node) {
+    const content = document.getElementById('infoPanelContent');
+    if (!content || !infoPanel) return;
+    
+    const chain = chainSelect?.value;
+    const chainConfig = CHAIN_CONFIGS[chain];
+    
+    const icon = node.isExchange ? '🏦' : '💼';
+    const label = node.isExchange ? 'Exchange' : 'Wallet';
+    
+    content.innerHTML = `
+        <div style="color:#00ffff;font-size:20px;margin-bottom:15px;">
+            ${icon} ${label}
+        </div>
+        
+        ${node.exchangeName ? `
+        <div style="margin-bottom:12px;">
+            <div style="color:#888;font-size:12px;">Exchange Name</div>
+            <div style="color:#FF9500;font-size:16px;font-weight:bold;">${node.exchangeName}</div>
+        </div>
+        ` : ''}
+        
+        <div style="margin-bottom:12px;">
+            <div style="color:#888;font-size:12px;">Address</div>
+            <div style="font-family:monospace;font-size:13px;word-break:break-all;background:rgba(0,255,255,0.1);padding:8px;border-radius:6px;">
+                ${node.address}
+            </div>
+        </div>
+        
+        <div style="margin-bottom:12px;">
+            <div style="color:#888;font-size:12px;">Chain</div>
+            <div style="color:#00ffff;font-weight:bold;">${chainConfig?.name}</div>
+        </div>
+        
+        ${node.totalBalanceUSD > 0 ? `
+        <div style="margin-bottom:15px;">
+            <div style="color:#888;font-size:12px;margin-bottom:8px;">Total Assets</div>
+            <div style="color:#00ff88;font-size:24px;font-weight:bold;">
+                $${node.totalBalanceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}
+            </div>
+        </div>
+        
+        <div style="margin-bottom:12px;">
+            <div style="color:#888;font-size:12px;margin-bottom:8px;">Holdings</div>
+            <div style="background:rgba(0,255,255,0.05);border-radius:8px;padding:10px;max-height:300px;overflow-y:auto;">
+                ${node.tokens.map(token => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <div>
+                            <div style="color:#00ffff;font-weight:600;font-size:14px;">${token.symbol}</div>
+                            <div style="color:#888;font-size:11px;">${token.balance.toFixed(4)}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="color:#00ff88;font-weight:600;">$${token.valueUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}</div>
+                            <div style="color:#888;font-size:11px;">@ $${token.priceUSD.toLocaleString('en-US', {maximumFractionDigits: 2})}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : `
+        <div style="color:#888;font-size:13px;padding:12px;background:rgba(255,255,255,0.05);border-radius:6px;">
+            Loading asset info...
+        </div>
+        `}
+        
+        <button id="exploreFromNode" style="width:100%;padding:12px;background:linear-gradient(135deg,#00ffff,#0088ff);border:none;border-radius:8px;color:#000;font-weight:bold;cursor:pointer;margin-top:15px;">
+            Explore from this address
+        </button>
+        
+        <button id="viewOnExplorer" style="width:100%;padding:12px;background:linear-gradient(135deg,#9933ff,#ff3366);border:none;border-radius:8px;color:#fff;font-weight:bold;cursor:pointer;margin-top:10px;">
+            🔗 View on ${chainConfig?.name} Explorer
+        </button>
+    `;
+    
+    infoPanel.classList.add('show');
+    
+    // Explore from this address
+    document.getElementById('exploreFromNode')?.addEventListener('click', async () => {
+        document.getElementById('addressInput').value = node.address;
+        infoPanel.classList.remove('show');
+        
+        const limit = 20;
+        const result = await API.getTransactions(node.address, chain, limit, 'native', null);
+        
+        if (result.ok && result.data) {
+            buildGraphAppend(node.address, result.data, node);
+        }
+    });
+    
+    // View on Explorer
+    document.getElementById('viewOnExplorer')?.addEventListener('click', () => {
+        const explorerUrls = {
+            ethereum: `https://etherscan.io/address/${node.address}`,
+            bsc: `https://bscscan.com/address/${node.address}`,
+            polygon: `https://polygonscan.com/address/${node.address}`,
+            arbitrum: `https://arbiscan.io/address/${node.address}`,
+            optimism: `https://optimistic.etherscan.io/address/${node.address}`,
+            avalanche: `https://snowtrace.io/address/${node.address}`,
+            base: `https://basescan.org/address/${node.address}`
+        };
+        
+        const url = explorerUrls[chain];
+        if (url) {
+            window.open(url, '_blank');
+        }
+    });
+}
+
+console.log('✅ Explorer button added to info panel');
