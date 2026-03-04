@@ -196,21 +196,21 @@
         /* リセットボタン */
         .reset-button {
             position: absolute;
-            bottom: 30px;
-            left: 30px;
-            padding: 15px 25px;
-            background: linear-gradient(135deg, #ff00ff, #ff0088);
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-weight: bold;
-            font-size: 14px;
+            top: 10px;  /* bottom: 30px を変更 */
+            left: 10px;  /* left: 30px を変更 */
+            padding: 8px 16px;  /* padding: 15px 25px を変更 */
+            background: linear-gradient(135deg, rgba(0,255,255,0.2), rgba(0,136,255,0.2));
+            border: 1px solid rgba(0,255,255,0.5);
+            border-radius: 8px;
+            color: #00ffff;  /* color: white を変更 */
+            font-weight: 600;
+            font-size: 13px;  /* font-size: 14px を変更 */
             cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 6px 20px rgba(255, 0, 255, 0.4);
+            text-transform: none;  /* text-transform: uppercase を変更 */
+            letter-spacing: normal;  /* letter-spacing: 1px を変更 */
+            box-shadow: 0 0 20px rgba(0,255,255,0.3);
             transition: all 0.3s;
-            z-index: 10;
+            z-index: 100;
         }
         .reset-button:hover {
             transform: translateY(-3px);
@@ -284,9 +284,12 @@
             overflow: hidden;
         }
         .legend-content.collapsed {
-            max-height: 0 !important;
-            opacity: 0;
-            margin: 0;
+            display: none;  /* 既存のコード */
+        }
+
+        .legend.collapsed {
+            padding: 0;
+            min-height: 0;
         }
         .legend-header {
             display: flex;
