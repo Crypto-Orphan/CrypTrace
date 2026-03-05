@@ -268,8 +268,8 @@
         /* 凡例 */
         .legend {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
+            top: 60px;  /* bottom: 20px; を削除してこれに変更 */
+            left: 10px;  /* right: 20px; を削除してこれに変更 */
             background: rgba(15, 15, 25, 0.95);
             border: 2px solid rgba(0, 255, 255, 0.5);
             border-radius: 12px;
